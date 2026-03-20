@@ -31,6 +31,36 @@ The key architectural shift is:
 - `inject-content` becomes the documented final render boundary
 - `clone-content` becomes the documented explicit draft create/update boundary
 
+## Build Checklist
+
+This checklist maps the desired flow to the current codebase and the next module
+or capability that still needs to be built.
+
+| Desired flow step | What already exists | What module must be built next |
+| --- | --- | --- |
+| Auth | `ghl-services/authentication-ghl` validates token and location scope. | Nothing new for v1 pipeline order; reuse the existing auth gate. |
+| Fetch/view template | `ghl-services/ghl-fetch-templates` fetches inventory and `ghl-services/ghl-update-template/view-content` resolves template and preview HTML. | Nothing new for the basic step; later refine preview inspection if stricter slot validation is needed. |
+| Research content | No runtime research-content module exists yet. Docs now reserve `ghl-services/research-content`. | Build `ghl-services/research-content` to output ordered raw HTML fragments. |
+| Pexels image sourcing | `pexels-api-references` defines the sourcing contract, but there is no execution module yet. | Build a Pexels execution module that follows `pexels-api-references` and outputs normalized image selections. |
+| GHL media upload/link resolution | `ghl-medias-enpoints-reference` documents the APIs and `ghl-services/ghl-media-usage` is reserved as a planned folder, but no runtime implementation exists yet. | Build `ghl-services/ghl-media-usage` to upload approved images, resolve hosted GHL links, and return rich render-ready image objects. |
+| Final Jinja render | `ghl-services/ghl-update-template/inject-content` exists, but only as `inject-sample.mjs` for one local sample block. | Upgrade `ghl-services/ghl-update-template/inject-content` into the real final render stage that accepts preview/template HTML, ordered research fragments, and rich GHL image objects, and improve the Jinja renderer and injection tool so they fit the evolving base template correctly. |
+| Draft create/update | `ghl-services/ghl-update-template/clone-content` already creates a draft and updates HTML through GHL. | Refine `clone-content` to consume explicit rendered HTML from `inject-content` instead of relying on the newest injected artifact as the preferred path. |
+
+### Short version
+
+- Already usable now:
+  - auth
+  - template fetch/view
+  - draft clone/update
+  - sample local injection
+- Must be built next for the target pipeline:
+  - `ghl-services/research-content`
+  - Pexels execution module
+  - `ghl-services/ghl-media-usage`
+  - final-render version of `ghl-services/ghl-update-template/inject-content`
+  - better Jinja renderer and injection tooling aligned to the base template
+  - explicit rendered-HTML handoff into `clone-content`
+
 ## Modules
 
 ### Implemented now
@@ -148,6 +178,7 @@ node ghl-services/ghl-update-template/clone-content/publish-injected-draft.mjs -
 - Ordered research HTML fragments as upstream content input
 - Pexels image selection followed by GHL media upload/link resolution
 - Final Jinja render as the last content-assembly step
+- Better Jinja renderer and injection behavior aligned to the base template
 - Explicit rendered HTML handoff from `inject-content` to `clone-content`
 - Stronger validation for URLs, image presence, and render inputs
 

@@ -108,6 +108,7 @@ The intended next-state handoffs are:
 - Pexels execution module
 - GHL media-upload/link-resolution module
 - Final Jinja render as the last content-assembly step
+- Better Jinja renderer and injection tooling aligned to the evolving base template
 - Explicit render-to-publish handoff
 - Structured multi-block render support
 - Optional-image rendering path
