@@ -36,8 +36,10 @@ Service for selecting a target template and optionally fetching and saving previ
 ## Behavior Summary
 - Validates auth, token, and location before template queries.
 - Fetches builders from `GET /emails/builder` with `limit=100`.
+- Falls back to a name query and pagination when needed.
 - Supports case-insensitive name match and exact id match.
 - If preview flow succeeds, saves HTML under `previews/<templateId>-<timestamp>.html`.
+- Preview dumps include both raw HTML and a lightweight structural summary.
 
 ## Error Codes (Selection)
 - `AUTH_CHECK_FAILED`
@@ -90,6 +92,3 @@ Service for selecting a target template and optionally fetching and saving previ
 - Route template lookup and validation tasks here.
 - Route preview HTML retrieval and basic DOM and asset extraction tasks here.
 - Do not implement create or update API mutations in this folder.
-
-## Example
-- `npm --prefix ghl-services/ghl-update-template/view-content run view:preview-url -- --template-name="Weekly Update"`

@@ -1,15 +1,16 @@
 # Clone Content Dataflow Map
 
 ## Purpose
-This package turns an existing GoHighLevel email template into a new draft by:
+This package has two related live-update paths:
 
-1. selecting a base template through `view-content`
-2. fetching that template's preview HTML
-3. creating a new HTML draft shell
-4. uploading the fetched HTML into the new draft
-
-The package also includes a wrapper script that takes the clone result and
-replaces the new draft HTML with the latest injected newsletter artifact.
+1. a standalone clone flow that turns an existing GoHighLevel email template
+   into a new draft by:
+   - selecting a base template through `view-content`
+   - fetching that template's preview HTML
+   - creating a new HTML draft shell
+   - uploading the fetched HTML into that draft
+2. a publish wrapper that clones a fresh draft and then overwrites that new
+   draft with the newest injected newsletter artifact found on disk
 
 ## Inputs
 
@@ -25,6 +26,7 @@ replaces the new draft HTML with the latest injected newsletter artifact.
 - `--draft-name`
 
 ### `publish-injected-draft.mjs`
+- the same passthrough CLI args accepted by `src/clone-template.cli.ts`
 - clone CLI path override via `PUBLISH_INJECTED_DRAFT_CLI_PATH`
 - env file path override via `PUBLISH_INJECTED_DRAFT_ENV_PATH`
 - injection directory override via `PUBLISH_INJECTED_DRAFT_INJECTION_DIR`
@@ -51,6 +53,7 @@ sets exit code `0` on success, `1` on failure.
 - the clone result
 - the injected HTML source file that was published
 - the final publish request result
+- final preview and template-data URLs when available
 
 ## Step-by-Step Execution Path
 
@@ -78,7 +81,7 @@ sets exit code `0` on success, `1` on failure.
 ### `publish-injected-draft.mjs`
 1. Find the newest HTML file inside `inject-content/injection-output`.
 2. Read that HTML into memory.
-3. Spawn the clone CLI and capture stdout/stderr.
+3. Spawn the clone CLI and pass through wrapper CLI args.
 4. If the child fails before returning JSON, emit wrapper-owned JSON with
    diagnostic snippets.
 5. If the child returned a clone failure JSON result, pass it through unchanged.
@@ -96,7 +99,8 @@ sets exit code `0` on success, `1` on failure.
 | Preview fetch | `baseTemplate.previewUrl` | `fetchPreviewHtml` downloads raw HTML and captures diagnostics | `previewFetch.html`, `previewFetch.diagnostics` |
 | Draft create | `locationId`, token, `draftName` | `POST /emails/builder` creates empty HTML draft | `templateId`, `createRequest` |
 | Draft update | `templateId`, `previewFetch.html` | `POST /emails/builder/data` uploads HTML into the draft | `clonedTemplate`, `updateRequest` |
-| Publish wrapper | newest injected HTML file, clone result | wrapper reuses cloned template id and publishes injected HTML | combined publish JSON |
+| Publish wrapper discovery | injected artifact directory | wrapper picks the newest `.html` file by modified time | `sourceInjectedHtml` |
+| Publish wrapper publish | newest injected HTML file, clone result | wrapper reuses cloned template id and publishes injected HTML | combined publish JSON |
 
 ## Failure Paths
 
@@ -114,6 +118,7 @@ sets exit code `0` on success, `1` on failure.
 - `UNKNOWN_ERROR`: runtime/network failure after preview fetch succeeded
 
 ### Publish wrapper
+- no injected HTML files found in the configured injection directory
 - clone subprocess error before JSON output
 - clone subprocess returned structured failure JSON
 - missing token or location during publish step
@@ -134,6 +139,14 @@ sets exit code `0` on success, `1` on failure.
 - verifies clone failure JSON is passed through unchanged
 - verifies wrapper-owned JSON is emitted when the clone subprocess fails before
   returning JSON
+
+## Practical Notes
+- There is still no single repo-level command that runs preview dump, injection,
+  clone, and publish together.
+- `publish-injected-draft.mjs` is the closest thing to an end-to-end publish
+  step, but it assumes an injected artifact already exists.
+- If multiple injected artifacts exist, the wrapper chooses the newest file by
+  modified time rather than by an explicit user-provided path.
 
 ## Documentation Rules for Future Edits
 - Add comments above logical blocks, not above every line
