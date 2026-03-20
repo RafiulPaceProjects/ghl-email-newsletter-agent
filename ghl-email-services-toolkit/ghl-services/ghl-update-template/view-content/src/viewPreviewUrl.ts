@@ -472,26 +472,6 @@ export async function viewPreviewUrlDumpFromEnv(
     dump = buildDumpPayload(fetchedAt, selectedTemplate, html);
   } catch (error) {
     const snippet =
-      error instanceof Error ? cleanSnippet(error.message) : "Unknown error";
-    return {
-      ok: false,
-      fetchedAt,
-      locationId: viewResult.locationId,
-      selectedTemplate,
-      previewFetch: {
-        status: fetchDiagnostics.status,
-        responseSnippet: snippet
-      },
-      message: "Failed to parse preview HTML.",
-      errorCode: "PARSE_ERROR" as const
-    };
-  }
-
-  let dump: PreviewDumpPayload;
-  try {
-    dump = buildDumpPayload(fetchedAt, selectedTemplate, html);
-  } catch (error) {
-    const snippet =
       error instanceof Error ? cleanSnippet(error.message) : 'Unknown error';
     return {
       ok: false,
