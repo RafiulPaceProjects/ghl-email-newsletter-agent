@@ -399,3 +399,23 @@ You now have a full:
 
 [1]: https://marketplace.gohighlevel.com/docs/ghl/medias/upload-media-content/index.html?utm_source=chatgpt.com "Upload File into Media Storage | HighLevel API"
 [2]: https://ideas.gohighlevel.com/apis/p/return-url-of-file-upload-to-media-library?utm_source=chatgpt.com "Return URL of File Upload to Media Library | Voters"
+
+---
+
+## 🔹 Developer Notes & Troubleshooting (March 20, 2026)
+
+### Fixed Payload Too Large / Invalid File Type (HTTP 400)
+When doing direct `multipart/form-data` uploads using standard JS `Blob` logic, the upload will return **400 Invalid File Type** if you do not explicitly declare the MIME type of the Blob.
+
+**Fix:** Ensure the type options object sets `type: "image/jpeg"` (or png/gif) when constructing the Blob object within the form data allocation.
+
+```ts
+form.set(
+  'file',
+  new Blob([fileBuffer], { type: 'image/jpeg' }), 
+  finalName
+);
+```
+
+### File URLs returned directly on upload
+While old documentation suggests the URL cannot be known without a subsequent `GET /medias/files` query, doing an immediate sync has proven unstable due to propagation delays (Empty results despite success). **Fortunately, testing reveals GHL POST `/medias/upload-file` will directly return the file URL underneath `result.data.url` (sometimes alongside `_id` or `fileId` based on internal schemas)**. Always extract the `url` from the initial upload payload to bypass unreliable polling.

@@ -31,19 +31,25 @@ Implemented today:
 2. Fetch template inventory in `ghl-services/ghl-fetch-templates`.
 3. Select a template or dump preview HTML in
    `ghl-services/ghl-update-template/view-content`.
-4. Clone preview HTML into a new draft in
+4. Generate structured newsletter research JSON in
+   `ghl-services/research-content`.
+5. Clone preview HTML into a new draft in
    `ghl-services/ghl-update-template/clone-content`.
-5. Inject a local sample newsletter artifact in
+6. Inject a local sample newsletter artifact in
    `ghl-services/ghl-update-template/inject-content`.
-6. Publish the newest injected artifact through
+7. Publish the newest injected artifact through
    `ghl-services/ghl-update-template/clone-content/publish-injected-draft.mjs`.
+
+The current GHL publish path is still preview -> local sample injection ->
+clone/publish. `research-content` is implemented, but it is not yet wired into
+that publish path.
 
 ## Intended Next Workflow
 
 The docs in this repo now align to this next target pipeline:
 
 ```text
-auth -> fetch/view template -> research content -> Pexels image sourcing -> GHL media upload/link resolution -> final Jinja render -> draft create/update
+auth -> fetch/view template -> research content -> Pexels candidate download -> Image_Qualifyer final selection -> GHL media upload/link resolution -> final Jinja render -> draft create/update
 ```
 
 ## Inputs / Outputs / Contracts
@@ -60,6 +66,8 @@ auth -> fetch/view template -> research content -> Pexels image sourcing -> GHL 
   - template snapshot JSON
   - preview HTML dumps
   - injected/rendered HTML artifacts
+  - Pexels candidate downloads under `ghl-media-usage/pexel_downloader/downloads/`
+  - final approved images and JSON under `ghl-media-usage/Image_Qualifyer/output/`
 
 ## Routing Rules
 
@@ -71,8 +79,10 @@ auth -> fetch/view template -> research content -> Pexels image sourcing -> GHL 
   `ghl-services/ghl-update-template/inject-content`
 - Draft creation or explicit publish work:
   `ghl-services/ghl-update-template/clone-content`
-- Planned research-content contract work:
+- Research brief to newsletter JSON work:
   `ghl-services/research-content`
+- Shared cross-package JSON contract work:
+  `ghl-services/contracts`
 - Planned GHL media upload/link-resolution contract work:
   `ghl-services/ghl-media-usage`
 - Pexels sourcing and normalization contract questions:
@@ -92,6 +102,8 @@ auth -> fetch/view template -> research content -> Pexels image sourcing -> GHL 
   - intended next architecture
 - Generated artifacts under `data/`, `previews/`, and `injection-output/` are
   operational outputs, not source files.
+- Keep candidate downloads out of `Image_Qualifyer/output/`.
+- Keep only the two final approved images in `Image_Qualifyer/output/`.
 
 ## Newsletter Contract Status
 
@@ -103,7 +115,8 @@ auth -> fetch/view template -> research content -> Pexels image sourcing -> GHL 
 
 ### Planned next
 - ordered research HTML fragments
-- normalized Pexels image selections
+- downloader-owned Pexels candidate batches
+- final `Hero` and `Secondary` image approval in `Image_Qualifyer`
 - GHL media upload and hosted-link resolution
 - final Jinja render inside `inject-content`
 - explicit rendered HTML publish through `clone-content`
@@ -112,5 +125,7 @@ auth -> fetch/view template -> research content -> Pexels image sourcing -> GHL 
 
 - `npm run validate`
 - `npm --prefix ghl-services/authentication-ghl run check:connection`
+- `npm --prefix ghl-services/ghl-media-usage/pexel_downloader run download:images -- --query=<query>`
+- `npm --prefix ghl-services/ghl-media-usage/Image_Qualifyer run qualify:images -- --input-file=<path>`
 - `npm --prefix ghl-services/ghl-update-template/view-content run view:preview-url -- --template-id=<id>`
 - `node ghl-services/ghl-update-template/inject-content/inject-sample.mjs --preview-html ./path/to/preview.html`

@@ -2,25 +2,38 @@
 
 ## Purpose
 
-Planned service boundary for GHL media upload and hosted-link resolution in the
+Implemented service boundary for GHL media upload and hosted-link resolution in the
 newsletter image pipeline.
 
 ## Status
 
-- Planned module only.
-- No runtime implementation exists in this folder yet.
+- `ghl-media-usage/ghl_uploader` is now an implemented runtime subpackage
+  for uploading qualified artifacts to GHL and directly resolving final CDN URLs.
+- `ghl-media-usage/pexel_downloader` is now an implemented runtime subpackage
+  for Pexels auth, search, normalization, and local downloads.
+- `ghl-media-usage/Image_Qualifyer` is now an implemented runtime subpackage
+  for editorial scoring, ranking, and final slot selection before upload.
 
 ## Intended Position In Pipeline
 
 ```text
-pexels normalized selections -> ghl-media-usage -> inject-content final render
+research-driven pexels candidates -> pexel_downloader downloads ->
+Image_Qualifyer final selection -> ghl-uploader -> inject-content final render
 ```
 
 ## Intended Inputs
 
-- normalized Pexels image selections
+- downloader manifests and normalized Pexels candidate images
+- final selected `Hero` and `Secondary` images from `Image_Qualifyer`
 - shared auth env from `authentication-ghl/.env`
 - target location id
+
+## Storage Boundary
+
+- Candidate downloads belong under
+  `ghl-media-usage/pexel_downloader/downloads/`.
+- `Image_Qualifyer/output/` should keep only qualifier JSON artifacts and the
+  two approved images copied for handoff.
 
 ## Intended Responsibilities
 

@@ -22,7 +22,7 @@ The repository currently supports this executable flow:
 The docs now align to this target pipeline:
 
 ```text
-auth -> fetch/view template -> research content -> Pexels image sourcing -> GHL media upload/link resolution -> final Jinja render -> draft create/update
+auth -> fetch/view template -> research content -> Pexels candidate download -> Image_Qualifyer final selection -> GHL media upload/link resolution -> final Jinja render -> draft create/update
 ```
 
 ## Modules And Flows
@@ -70,22 +70,57 @@ auth -> fetch/view template -> research content -> Pexels image sourcing -> GHL 
 - Planned upstream content stage.
 - Expected output: ordered raw HTML fragments.
 - Not responsible for image upload or template publish.
+- While package-local schema work continues in `research-content`, any
+  cross-package contract extracted from that output should live in
+  `ghl-services/contracts`.
 
 #### `pexels-api-references`
 - Already defines the future Pexels sourcing contract.
 - Expected future execution output: normalized image selections.
 
 #### `ghl-media-usage`
-- Existing empty folder reserved for the planned GHL media stage.
-- Expected input: normalized Pexels image selections.
-- Expected output: rich GHL image objects for render.
+- Existing structure capturing Pexels downloader, Image Qualifier and the GHL media uploader.
+- Expected input: compiled `upload-manifest.json` from qualifier output.
+- Expected output: rich GHL image objects with hosted CDN URLs for render.
+
+#### `ghl-media-usage/ghl_uploader`
+- Implemented GHL media uploader package.
+- Consumes qualifier manifest pointing to approved images.
+- Properly sets `image/jpeg` (or corresponding mime type) Blob to satisfy GHL Media Endpoint checks, avoiding HTTP `400 Invalid File Type`.
+- Successfully resolves `fileId` and `url` natively returning from the GHL `POST /medias/upload-file` response (no folder polling necessary).
+
+#### `ghl-media-usage/pexel_downloader`
+- Implemented Pexels runtime downloader package.
+- Accepts explicit queries now and is prepared for future research-output query
+  adapters.
+- Downloads up to 15 images into a managed local folder and writes a manifest
+  with attribution and provider metadata.
+- Candidate download batches belong under
+  `ghl-services/ghl-media-usage/pexel_downloader/downloads/`.
+- Does not upload anything to GHL yet.
+
+#### `ghl-media-usage/Image_Qualifyer`
+- Implemented final image-selection package.
+- Consumes slot-grouped candidate sets plus research context.
+- Selects one `Hero` and one `Secondary` image with LangGraph + Gemini.
+- Uses shared Zod-backed contracts from `ghl-services/contracts`.
+- Must keep only qualifier JSON artifacts and the two approved images under
+  `Image_Qualifyer/output/`.
+
+#### `contracts`
+- Shared internal package for Zod-backed JSON contracts.
+- Preferred home for schemas that are produced in one service and consumed in
+  another.
+- Current shared contracts cover research-output query adapters, qualifier
+  manifests, and image-qualifyer inputs.
 
 ## Contract Direction
 
 The intended next-state handoffs are:
 
 - Research output: ordered raw HTML fragments
-- Pexels output: normalized image selections
+- Pexels output: normalized candidate images plus downloader manifest
+- Qualifier output: exactly two approved images, one per slot
 - Media output: rich GHL image objects with slot, hosted GHL URL, media/file
   id, alt text, attribution, and retained provider metadata as needed
 - Final render input: base preview/template HTML + ordered research fragments +
@@ -105,8 +140,6 @@ The intended next-state handoffs are:
 
 ### Missing in runtime
 - Ordered research-content input
-- Pexels execution module
-- GHL media-upload/link-resolution module
 - Final Jinja render as the last content-assembly step
 - Better Jinja renderer and injection tooling aligned to the evolving base template
 - Explicit render-to-publish handoff
@@ -124,6 +157,8 @@ The intended next-state handoffs are:
   repo tree.
 - The shared env file lives under one package and is reused across others by
   relative path.
+- Generated media artifacts can drift into the wrong folder if live runs bypass
+  the intended downloader/qualifier boundary.
 
 ### Transitional by design
 - The inject step is still sample-driven and local-first.
@@ -142,6 +177,10 @@ This doc set is aligned so that:
 - `clone-content` is the documented draft create/update boundary in the target
   architecture
 - `ghl-media-usage` is the planned GHL image upload/link-resolution boundary
+- `ghl-services/contracts` is the shared JSON contract boundary
+- `pexel_downloader` is the only candidate-download storage boundary
+- `Image_Qualifyer/output/` keeps only the final two approved images plus JSON
+  artifacts
 - current sample/local injection behavior is still called out explicitly as the
   runtime reality
 
