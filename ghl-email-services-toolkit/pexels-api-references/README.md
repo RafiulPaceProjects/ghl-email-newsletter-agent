@@ -3,17 +3,18 @@
 ## Overview
 
 This folder documents the planned Pexels image-sourcing boundary for the
-newsletter pipeline. It is a reference/spec set for Mode 1, not an implemented
-runtime service in this repository today.
+newsletter pipeline. It is a reference/spec set for a future execution module,
+not an implemented runtime service in this repository today.
 
-The documented contract covers a deterministic flow:
+The documented contract covers this boundary:
 
 ```text
-query -> search -> selection -> normalization -> downstream handoff
+query -> search -> selection -> normalization -> ghl-media-usage handoff
 ```
 
-The downstream consumer is expected to receive normalized image metadata, not
-raw Pexels API payloads.
+The next downstream stage after this folder is the planned
+`ghl-services/ghl-media-usage` module, which should upload approved images to
+GHL and resolve final hosted image links before render.
 
 ## Mode 1 Scope
 
@@ -37,7 +38,20 @@ The Pexels module spec is responsible for:
 3. Collecting a small candidate set from page 1 only.
 4. Ranking and selecting one image for `Hero` and one for `Secondary`.
 5. Normalizing the selected images into a stable internal schema.
-6. Returning contract-safe output for downstream media upload or rendering work.
+6. Returning contract-safe output for `ghl-media-usage`.
+
+## Downstream Contract
+
+The output from this boundary should be:
+
+- normalized image selections
+- never raw Pexels payloads as the downstream interface
+
+The next documented handoff is:
+
+```text
+pexels normalized selections -> ghl-media-usage -> rich GHL image objects -> inject-content final render
+```
 
 ## Pexels API Facts Used By This Folder
 
@@ -48,22 +62,15 @@ The Pexels module spec is responsible for:
 - `per_page` max: `80`
 - Default rate limit: `200` requests/hour and `20,000` requests/month
 
-These values match the current official Pexels documentation and Help Center
-guidance.
-
 ## Attribution Expectations
 
 Pexels requires visible attribution in the product flow using the API. The
 official guidance is to link back to Pexels prominently and credit the
 photographer when possible.
 
-Examples:
-
-- `Photos provided by Pexels`
-- `Photo by Jane Doe on Pexels`
-
-This folder treats attribution as an integration requirement even though the
-rendering layer is outside this folder's scope.
+This folder treats attribution as data that should survive into downstream
+contracts so GHL-hosted image objects still carry enough metadata for final
+render decisions.
 
 ## Design Principles
 
@@ -87,5 +94,5 @@ rendering layer is outside this folder's scope.
 ## Summary
 
 Use this folder as the contract for a future Pexels sourcing module. For Mode 1
-it is intentionally limited to two slot-specific photo selections with
-deterministic query, search, selection, and normalization behavior.
+it is intentionally limited to two slot-specific photo selections whose output
+should feed `ghl-media-usage`, then final render.

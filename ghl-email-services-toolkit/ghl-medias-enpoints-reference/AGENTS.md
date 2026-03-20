@@ -30,6 +30,14 @@ Hard rules:
 - Never update or delete any file unless `file.folderId === managedFolderId`.
 - If scope cannot be proven, fail closed and do not mutate.
 
+## Intended Position In Pipeline
+
+This reference set supports the planned `ghl-services/ghl-media-usage` stage:
+
+```text
+normalized Pexels selections -> upload/resolve in GHL -> rich GHL image objects -> final render
+```
+
 ## How To Use These References
 
 ### 1. Discovery and scope guard
@@ -51,12 +59,12 @@ Use `ghl-upload-files-endpoint.md` for ingesting newsletter images.
 
 Agent behavior:
 
-- Prefer hosted upload when ingesting approved Pexels URLs (`hosted=true`).
+- Prefer hosted upload when ingesting approved external image URLs.
 - Use direct multipart upload only when file bytes are already local.
 - Always include `locationId` and `folderId=managedFolderId`.
 - Enforce size and type validation before upload.
-- After upload, re-read with `GET /medias/files` to resolve canonical URL and
-  confirm folder placement.
+- After upload, re-read with `GET /medias/files` to resolve canonical hosted
+  GHL URLs and confirm folder placement.
 
 ### 3. Single-item update workflow
 
@@ -70,7 +78,7 @@ Agent behavior:
 
 ### 4. Bulk update workflow
 
-Use `ghl-bulk-update-files-folder.md` for multi-file rename/move.
+Use `ghl-bulk-update-files-folder.md` for multi-file rename or move.
 
 Agent behavior:
 
@@ -92,14 +100,14 @@ Agent behavior:
 
 ## High-Level Execution Plan
 
-### Normal content cycle
+### Planned image handoff cycle
 
 ```text
 1) Resolve managed folder (find or create)
-2) Fetch/validate candidate newsletter images
-3) Upload images into managed folder
+2) Validate normalized image selections
+3) Upload approved images into managed folder
 4) Re-read scoped folder and confirm uploaded objects
-5) Return stable file URLs + metadata for template injection
+5) Return rich GHL image objects for final render
 ```
 
 ### Weekly stats maintenance cycle
@@ -144,11 +152,23 @@ Per call requirements:
 - `medias.readonly` for list operations
 - `medias.write` for upload/update/delete operations
 
+## Output Contract Direction
+
+The intended downstream output from the planned media stage is not just generic
+file URLs. It should be rich render-ready GHL image objects containing:
+
+- slot name
+- GHL hosted URL
+- GHL media/file id
+- alt text
+- attribution metadata
+- retained provider metadata needed by final render
+
 ## Validation and Safety Gates
 
 Before upload:
 
-- Validate source trust (approved source), file type, and size.
+- Validate source trust, file type, and size.
 - Ensure managed folder is resolved.
 
 Before update or delete:
@@ -197,12 +217,5 @@ newsletter-housing-2026-03-20-01
 ## Summary
 
 This reference folder should be used as an execution contract for a
-folder-scoped newsletter media agent:
-
-- list to establish scope
-- upload into scope
-- update inside scope
-- bulk update inside scope
-- bulk delete inside scope only
-
-Safety is higher priority than speed.
+folder-scoped newsletter media agent that resolves render-ready GHL image
+objects safely. Safety is higher priority than speed.

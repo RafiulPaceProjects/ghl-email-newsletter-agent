@@ -16,7 +16,8 @@ Important repo reality:
 
 - Upstream input: newsletter topic or story context
 - This module boundary: query, search, selection, normalization
-- Downstream handoff: normalized image metadata for upload or rendering systems
+- Downstream handoff: `ghl-services/ghl-media-usage`
+- Later downstream consumer: `ghl-services/ghl-update-template/inject-content`
 
 Mode 1 scope is fixed:
 
@@ -34,7 +35,7 @@ This folder's contract says the Pexels module should:
 - gather candidate images from bounded page-1 searches
 - rank candidates for editorial fit and slot fit
 - normalize selected images into a stable internal schema
-- return machine-safe, downstream-ready normalized output
+- return machine-safe normalized output for `ghl-media-usage`
 
 This folder's contract says the Pexels module should not:
 
@@ -72,7 +73,7 @@ Use these combinations by task:
 Expected pipeline:
 
 ```text
-query -> search -> candidates -> selection -> normalization -> output
+query -> search -> candidates -> selection -> normalization -> ghl-media-usage
 ```
 
 Expected order of operations:
@@ -83,7 +84,7 @@ Expected order of operations:
 4. Rank candidates deterministically.
 5. Select one `Hero` image and one `Secondary` image.
 6. Normalize the selected images before any downstream use.
-7. Return normalized output or a structured error.
+7. Hand normalized selections to `ghl-media-usage`.
 
 ## Non-Negotiable Rules
 
@@ -105,6 +106,13 @@ Treat the following as source-of-truth expectations across the folder:
 - fallback queries are bounded and deterministic
 - downstream consumers depend on normalized output fields such as `pexelsUrl`,
   `source.preferred`, and `variants.*`
+
+## Downstream Handoff Rules
+
+- `ghl-media-usage` should receive normalized selections, not raw provider
+  payloads
+- final render should use GHL-hosted image objects, not direct Pexels URLs
+- attribution and alt-text metadata should survive the handoff where needed
 
 ## Attribution And Limits
 
@@ -136,5 +144,5 @@ satisfied.
 
 This folder should be treated as a deterministic, contract-first design
 boundary for Mode 1 Pexels sourcing. Keep it narrow, reproducible, and aligned
-with the actual supporting docs in this folder and the official Pexels API
-documentation.
+with the actual supporting docs in this folder, `ghl-media-usage`, and the
+official Pexels API documentation.

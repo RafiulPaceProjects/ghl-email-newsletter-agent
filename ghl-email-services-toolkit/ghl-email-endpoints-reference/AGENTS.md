@@ -20,20 +20,31 @@ implemented flow is split across services:
 2. template fetch or selection
 3. preview HTML retrieval
 4. draft clone
-5. local newsletter injection
+5. local sample newsletter injection
 6. injected draft publish
 
-The inject step is local-first today. Structured 10-block newsletter rendering
-is not implemented yet.
+The inject step is local-first today. Structured final multi-input rendering is
+not implemented yet.
+
+## Intended Next Publish Shape
+
+The preferred target architecture is:
+
+```text
+view-content -> research-content -> pexels selection -> ghl-media-usage -> inject-content final render -> clone-content explicit publish
+```
+
+The desired steady-state publish input is explicit rendered HTML from
+`inject-content`, not implicit "newest artifact on disk" discovery.
 
 ## Agent Responsibilities
 
 - Validate auth before downstream operations.
 - Fetch template metadata before assuming a template id.
 - Use `view-content` to resolve the template and preview URL.
-- Use `clone-content` to create a draft and upload HTML.
-- Use `inject-content` only for local slot replacement.
-- Use `publish-injected-draft.mjs` for the current injected-artifact publish path.
+- Use `inject-content` as the documented final render owner in the target flow.
+- Use `clone-content` to create drafts and publish explicit HTML.
+- Treat `publish-injected-draft.mjs` as the current transitional publish path.
 
 ## Agent Non-Responsibilities
 
@@ -46,8 +57,8 @@ is not implemented yet.
 - Always operate with a valid `locationId`.
 - Never assume a template id without fetching or selecting it first.
 - Prefer `templateId` for live mutations.
-- Treat `previewUrl` as a useful bridge for clone analysis, not as proof of
-  final publish state.
+- Treat `previewUrl` as a useful bridge for clone analysis and future render
+  planning, not as proof of final publish state.
 
 ## Current Endpoint Usage In This Repo
 
@@ -86,7 +97,7 @@ Clone step:
 }
 ```
 
-Publish wrapper step:
+Transitional publish wrapper step:
 
 ```json
 {
@@ -98,19 +109,19 @@ Publish wrapper step:
 }
 ```
 
-## Newsletter Injection Status
+## Contract Direction
 
 ### Supported now
 - one explicit body slot token
-- one bundled newsletter block partial
+- one bundled newsletter sample partial
 - local injected HTML artifact generation
-- publish handoff through the clone wrapper
+- publish handoff through the transitional clone wrapper
 
-### Missing now
-- up to 10 repeatable blocks
-- structured heading/body/image/CTA input contract
-- optional-image rendering
-- dedicated direct publish command inside `inject-content`
+### Planned next
+- ordered research HTML fragments upstream of render
+- rich GHL image objects upstream of render
+- final Jinja render in `inject-content`
+- explicit rendered HTML handoff into `clone-content`
 
 ## Error Handling Rules
 
@@ -123,10 +134,11 @@ Publish wrapper step:
 
 - Keep create and update logic separate.
 - Log enough response context to troubleshoot safely.
-- Keep generated HTML simple and deterministic.
+- Keep rendered HTML handoff explicit in the target design.
 - Preserve machine-readable JSON at CLI boundaries.
 
 ## Summary
 
-This repo currently supports a practical draft-clone and local injection flow,
-but not yet a fully structured 10-block newsletter publishing engine.
+This repo currently supports a practical clone plus local sample-injection flow.
+The docs now align to a target architecture where `inject-content` owns final
+render and `clone-content` owns explicit publish from rendered HTML.
