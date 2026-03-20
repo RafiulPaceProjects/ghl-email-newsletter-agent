@@ -1,0 +1,19 @@
+{
+  "name": "@ghl-services/authentication-ghl",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "check:connection": "tsx src/check-connection.cli.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^24.4.0",
+    "dotenv": "^16.6.1",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  }
+}

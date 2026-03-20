@@ -1,0 +1,20 @@
+# Node dependencies
+**/node_modules/
+
+# Secrets
+**/.env
+
+# Build / generated
+**/dist/
+**/*.log
+
+# Generated local artifacts
+**/previews/
+**/injection-output/
+
+# OS / editor
+.DS_Store
+.vscode/
+
+# Runtime fetched data
+**/data/templates.json
