@@ -1,0 +1,17 @@
+{
+  "name": "@ghl-services/inject-template-content",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "lint": "gts lint",
+    "fix": "gts fix",
+    "test": "node --test test/**/*.test.mjs"
+  },
+  "devDependencies": {
+    "gts": "^6.0.2"
+  }
+}

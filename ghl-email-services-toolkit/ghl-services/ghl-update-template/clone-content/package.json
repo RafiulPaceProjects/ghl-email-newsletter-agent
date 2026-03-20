@@ -1,5 +1,5 @@
 {
-  "name": "@ghl-services/authentication-ghl",
+  "name": "@ghl-services/clone-template-content",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -13,7 +13,7 @@
     "fix": "gts fix",
     "test": "node --import tsx --test test/**/*.test.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "check:connection": "tsx src/check-connection.cli.ts"
+    "clone:template": "tsx src/clone-template.cli.ts"
   },
   "devDependencies": {
     "@types/node": "^24.4.0",

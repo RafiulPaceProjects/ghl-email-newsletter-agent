@@ -1,35 +1,35 @@
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import dotenv from "dotenv";
+import {dirname, resolve} from 'node:path';
+import {fileURLToPath} from 'node:url';
+import dotenv from 'dotenv';
 
 import {
   checkGhlConnectionFromEnv,
-  type GhlConnectionResult
-} from "../../../authentication-ghl/src/checkGhlConnection.js";
+  type GhlConnectionResult,
+} from '../../../authentication-ghl/src/checkGhlConnection.js';
 
-const GHL_BASE_URL = "https://services.leadconnectorhq.com";
-const GHL_API_VERSION = "2021-07-28";
-const DEFAULT_TEMPLATE_NAME = "nycpolicyscopebase";
+const GHL_BASE_URL = 'https://services.leadconnectorhq.com';
+const GHL_API_VERSION = '2021-07-28';
+const DEFAULT_TEMPLATE_NAME = 'nycpolicyscopebase';
 const RESPONSE_SNIPPET_MAX_LENGTH = 280;
 
 const CURRENT_FILE_DIR = dirname(fileURLToPath(import.meta.url));
 const AUTH_ENV_PATH = resolve(
   CURRENT_FILE_DIR,
-  "../../../authentication-ghl/.env"
+  '../../../authentication-ghl/.env',
 );
 
 export type ViewTemplateErrorCode =
-  | "AUTH_CHECK_FAILED"
-  | "MISSING_TOKEN"
-  | "MISSING_LOCATION_ID"
-  | "FETCH_400"
-  | "FETCH_401"
-  | "FETCH_404"
-  | "FETCH_422"
-  | "FETCH_FAILED"
-  | "NETWORK_ERROR"
-  | "TEMPLATE_NOT_FOUND"
-  | "UNKNOWN_ERROR";
+  | 'AUTH_CHECK_FAILED'
+  | 'MISSING_TOKEN'
+  | 'MISSING_LOCATION_ID'
+  | 'FETCH_400'
+  | 'FETCH_401'
+  | 'FETCH_404'
+  | 'FETCH_422'
+  | 'FETCH_FAILED'
+  | 'NETWORK_ERROR'
+  | 'TEMPLATE_NOT_FOUND'
+  | 'UNKNOWN_ERROR';
 
 export interface GhlEmailBuilder {
   id: string;
@@ -45,7 +45,7 @@ export interface GhlEmailBuilder {
 
 export interface GhlFetchTemplatesResponse {
   builders: GhlEmailBuilder[];
-  total: Array<{ total: number }>;
+  total: Array<{total: number}>;
 }
 
 export interface SelectedTemplateSummary {
@@ -75,7 +75,7 @@ export interface ViewTemplateResult {
   fetchedAt: string;
   locationId: string | null;
   searchedBy: {
-    type: "id" | "name";
+    type: 'id' | 'name';
     value: string;
   };
   endpoint: string;
@@ -89,13 +89,13 @@ export interface ViewTemplateResult {
 }
 
 function loadSharedEnv(): void {
-  dotenv.config({ path: AUTH_ENV_PATH });
+  dotenv.config({path: AUTH_ENV_PATH});
 }
 
 function cleanSnippet(input: string): string {
-  const normalized = input.replace(/\s+/g, " ").trim();
+  const normalized = input.replace(/\s+/g, ' ').trim();
   if (!normalized) {
-    return "";
+    return '';
   }
   if (normalized.length <= RESPONSE_SNIPPET_MAX_LENGTH) {
     return normalized;
@@ -116,7 +116,7 @@ function parseJsonBody(raw: string): unknown {
 }
 
 function toNumberOrNull(input: unknown): number | null {
-  if (typeof input === "number" && Number.isFinite(input)) {
+  if (typeof input === 'number' && Number.isFinite(input)) {
     return input;
   }
   return null;
@@ -124,53 +124,53 @@ function toNumberOrNull(input: unknown): number | null {
 
 function mapErrorCodeByStatus(status: number): ViewTemplateErrorCode {
   if (status === 400) {
-    return "FETCH_400";
+    return 'FETCH_400';
   }
   if (status === 401) {
-    return "FETCH_401";
+    return 'FETCH_401';
   }
   if (status === 404) {
-    return "FETCH_404";
+    return 'FETCH_404';
   }
   if (status === 422) {
-    return "FETCH_422";
+    return 'FETCH_422';
   }
-  return "FETCH_FAILED";
+  return 'FETCH_FAILED';
 }
 
 function buildEndpoint(
   locationId: string,
-  query: Record<string, string> = {}
+  query: Record<string, string> = {},
 ): string {
-  const params = new URLSearchParams({ locationId, ...query });
+  const params = new URLSearchParams({locationId, ...query});
   return `/emails/builder?${params.toString()}`;
 }
 
 function safeBuilder(raw: unknown): GhlEmailBuilder | null {
-  if (!raw || typeof raw !== "object") {
+  if (!raw || typeof raw !== 'object') {
     return null;
   }
   const obj = raw as Record<string, unknown>;
 
-  if (typeof obj.id !== "string" || typeof obj.name !== "string") {
+  if (typeof obj.id !== 'string' || typeof obj.name !== 'string') {
     return null;
   }
 
   return {
     id: obj.id,
     name: obj.name,
-    updatedBy: typeof obj.updatedBy === "string" ? obj.updatedBy : "",
+    updatedBy: typeof obj.updatedBy === 'string' ? obj.updatedBy : '',
     isPlainText: Boolean(obj.isPlainText),
-    lastUpdated: typeof obj.lastUpdated === "string" ? obj.lastUpdated : "",
-    dateAdded: typeof obj.dateAdded === "string" ? obj.dateAdded : "",
-    previewUrl: typeof obj.previewUrl === "string" ? obj.previewUrl : "",
-    version: typeof obj.version === "string" ? obj.version : "",
-    templateType: typeof obj.templateType === "string" ? obj.templateType : ""
+    lastUpdated: typeof obj.lastUpdated === 'string' ? obj.lastUpdated : '',
+    dateAdded: typeof obj.dateAdded === 'string' ? obj.dateAdded : '',
+    previewUrl: typeof obj.previewUrl === 'string' ? obj.previewUrl : '',
+    version: typeof obj.version === 'string' ? obj.version : '',
+    templateType: typeof obj.templateType === 'string' ? obj.templateType : '',
   };
 }
 
 function toSelectedTemplateSummary(
-  template: GhlEmailBuilder
+  template: GhlEmailBuilder,
 ): SelectedTemplateSummary {
   return {
     id: template.id,
@@ -181,21 +181,21 @@ function toSelectedTemplateSummary(
     updatedBy: template.updatedBy,
     dateAdded: template.dateAdded,
     lastUpdated: template.lastUpdated,
-    version: template.version
+    version: template.version,
   };
 }
 
 function resolveSearch(options: ViewTemplateOptions): {
-  type: "id" | "name";
+  type: 'id' | 'name';
   value: string;
 } {
   const templateId = options.templateId?.trim();
   if (templateId) {
-    return { type: "id", value: templateId };
+    return {type: 'id', value: templateId};
   }
 
   const templateName = options.templateName?.trim() || DEFAULT_TEMPLATE_NAME;
-  return { type: "name", value: templateName };
+  return {type: 'name', value: templateName};
 }
 
 interface FetchBuildersPageResult {
@@ -211,21 +211,21 @@ interface FetchBuildersPageResult {
 
 function findSelectedTemplate(
   builders: GhlEmailBuilder[],
-  searchedBy: { type: "id" | "name"; value: string }
+  searchedBy: {type: 'id' | 'name'; value: string},
 ): GhlEmailBuilder | undefined {
-  if (searchedBy.type === "id") {
-    return builders.find((template) => template.id === searchedBy.value);
+  if (searchedBy.type === 'id') {
+    return builders.find(template => template.id === searchedBy.value);
   }
 
   const loweredName = searchedBy.value.trim().toLowerCase();
   return builders.find(
-    (template) => template.name.trim().toLowerCase() === loweredName
+    template => template.name.trim().toLowerCase() === loweredName,
   );
 }
 
 function mergeUniqueBuilders(
   base: GhlEmailBuilder[],
-  incoming: GhlEmailBuilder[]
+  incoming: GhlEmailBuilder[],
 ): GhlEmailBuilder[] {
   const byId = new Map<string, GhlEmailBuilder>();
   for (const template of base) {
@@ -240,21 +240,21 @@ function mergeUniqueBuilders(
 async function fetchBuildersPage(
   token: string,
   locationId: string,
-  query: Record<string, string>
+  query: Record<string, string>,
 ): Promise<FetchBuildersPageResult> {
   const endpoint = buildEndpoint(locationId, query);
   const url = new URL(`${GHL_BASE_URL}${endpoint}`);
 
   try {
     const response = await fetch(url, {
-      method: "GET",
+      method: 'GET',
       headers: {
         Authorization: `Bearer ${token}`,
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        Version: GHL_API_VERSION
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        Version: GHL_API_VERSION,
       },
-      signal: AbortSignal.timeout(12_000)
+      signal: AbortSignal.timeout(12_000),
     });
 
     const rawBody = await response.text();
@@ -268,17 +268,17 @@ async function fetchBuildersPage(
         endpoint,
         diagnostics: {
           status: response.status,
-          responseSnippet: snippet
+          responseSnippet: snippet,
         },
         builders: [],
         apiTotal: null,
         errorCode: mapErrorCodeByStatus(response.status),
-        message: `Template view fetch failed with HTTP ${response.status}.`
+        message: `Template view fetch failed with HTTP ${response.status}.`,
       };
     }
 
     const data =
-      parsedBody && typeof parsedBody === "object"
+      parsedBody && typeof parsedBody === 'object'
         ? (parsedBody as Record<string, unknown>)
         : {};
 
@@ -289,9 +289,9 @@ async function fetchBuildersPage(
 
     const totalArray = Array.isArray(data.total) ? data.total : [];
     const apiTotal = toNumberOrNull(
-      totalArray[0] && typeof totalArray[0] === "object"
+      totalArray[0] && typeof totalArray[0] === 'object'
         ? (totalArray[0] as Record<string, unknown>).total
-        : null
+        : null,
     );
 
     return {
@@ -300,15 +300,15 @@ async function fetchBuildersPage(
       endpoint,
       diagnostics: {
         status: response.status,
-        responseSnippet: snippet
+        responseSnippet: snippet,
       },
       builders,
       apiTotal,
-      message: "Template view fetch succeeded."
+      message: 'Template view fetch succeeded.',
     };
   } catch (error) {
     const snippet =
-      error instanceof Error ? cleanSnippet(error.message) : "Unknown error";
+      error instanceof Error ? cleanSnippet(error.message) : 'Unknown error';
 
     return {
       ok: false,
@@ -316,27 +316,27 @@ async function fetchBuildersPage(
       endpoint,
       diagnostics: {
         status: null,
-        responseSnippet: snippet
+        responseSnippet: snippet,
       },
       builders: [],
       apiTotal: null,
-      errorCode: "NETWORK_ERROR",
-      message: "Template view failed due to network/runtime error."
+      errorCode: 'NETWORK_ERROR',
+      message: 'Template view failed due to network/runtime error.',
     };
   }
 }
 
 export async function viewSelectedTemplateFromEnv(
-  options: ViewTemplateOptions = {}
+  options: ViewTemplateOptions = {},
 ): Promise<ViewTemplateResult> {
   loadSharedEnv();
 
   const auth = await checkGhlConnectionFromEnv();
   const fetchedAt = new Date().toISOString();
-  const locationId = process.env.GHL_LOCATION_ID?.trim() ?? "";
-  const token = process.env.GHL_PRIVATE_INTEGRATION_TOKEN?.trim() ?? "";
+  const locationId = process.env.GHL_LOCATION_ID?.trim() ?? '';
+  const token = process.env.GHL_PRIVATE_INTEGRATION_TOKEN?.trim() ?? '';
   const searchedBy = resolveSearch(options);
-  const endpoint = buildEndpoint(locationId || "<missing-location-id>");
+  const endpoint = buildEndpoint(locationId || '<missing-location-id>');
 
   if (!auth.ok) {
     return {
@@ -349,12 +349,12 @@ export async function viewSelectedTemplateFromEnv(
       returnedCount: 0,
       selectedTemplate: null,
       auth,
-      message: "Auth check failed. View step was not attempted.",
+      message: 'Auth check failed. View step was not attempted.',
       diagnostics: {
         status: null,
-        responseSnippet: auth.message
+        responseSnippet: auth.message,
       },
-      errorCode: "AUTH_CHECK_FAILED"
+      errorCode: 'AUTH_CHECK_FAILED',
     };
   }
 
@@ -369,12 +369,12 @@ export async function viewSelectedTemplateFromEnv(
       returnedCount: 0,
       selectedTemplate: null,
       auth,
-      message: "Missing GHL_PRIVATE_INTEGRATION_TOKEN.",
+      message: 'Missing GHL_PRIVATE_INTEGRATION_TOKEN.',
       diagnostics: {
         status: null,
-        responseSnippet: null
+        responseSnippet: null,
       },
-      errorCode: "MISSING_TOKEN"
+      errorCode: 'MISSING_TOKEN',
     };
   }
 
@@ -389,16 +389,18 @@ export async function viewSelectedTemplateFromEnv(
       returnedCount: 0,
       selectedTemplate: null,
       auth,
-      message: "Missing GHL_LOCATION_ID.",
+      message: 'Missing GHL_LOCATION_ID.',
       diagnostics: {
         status: null,
-        responseSnippet: null
+        responseSnippet: null,
       },
-      errorCode: "MISSING_LOCATION_ID"
+      errorCode: 'MISSING_LOCATION_ID',
     };
   }
 
-  const primaryPage = await fetchBuildersPage(token, locationId, { limit: "100" });
+  const primaryPage = await fetchBuildersPage(token, locationId, {
+    limit: '100',
+  });
   if (!primaryPage.ok) {
     return {
       ok: false,
@@ -412,7 +414,7 @@ export async function viewSelectedTemplateFromEnv(
       auth,
       message: primaryPage.message,
       diagnostics: primaryPage.diagnostics,
-      errorCode: primaryPage.errorCode ?? "UNKNOWN_ERROR"
+      errorCode: primaryPage.errorCode ?? 'UNKNOWN_ERROR',
     };
   }
 
@@ -423,9 +425,9 @@ export async function viewSelectedTemplateFromEnv(
 
   let selected = findSelectedTemplate(builders, searchedBy);
 
-  if (!selected && searchedBy.type === "name") {
+  if (!selected && searchedBy.type === 'name') {
     const namePage = await fetchBuildersPage(token, locationId, {
-      name: searchedBy.value
+      name: searchedBy.value,
     });
 
     if (namePage.ok) {
@@ -444,11 +446,29 @@ export async function viewSelectedTemplateFromEnv(
 
     while (offset < apiTotal) {
       const page = await fetchBuildersPage(token, locationId, {
-        limit: "100",
-        offset: String(offset)
+        limit: '100',
+        offset: String(offset),
       });
 
-      if (!page.ok || page.builders.length === 0) {
+      // Do not convert incomplete pagination into TEMPLATE_NOT_FOUND.
+      if (!page.ok) {
+        return {
+          ok: false,
+          fetchedAt,
+          locationId,
+          searchedBy,
+          endpoint: page.endpoint,
+          apiTotal,
+          returnedCount: builders.length,
+          selectedTemplate: null,
+          auth,
+          message: page.message,
+          diagnostics: page.diagnostics,
+          errorCode: page.errorCode ?? 'UNKNOWN_ERROR',
+        };
+      }
+
+      if (page.builders.length === 0) {
         break;
       }
 
@@ -478,9 +498,9 @@ export async function viewSelectedTemplateFromEnv(
       returnedCount,
       selectedTemplate: null,
       auth,
-      message: "Selected template was not found in fetched builders.",
+      message: 'Selected template was not found in fetched builders.',
       diagnostics,
-      errorCode: "TEMPLATE_NOT_FOUND"
+      errorCode: 'TEMPLATE_NOT_FOUND',
     };
   }
 
@@ -494,7 +514,7 @@ export async function viewSelectedTemplateFromEnv(
     returnedCount,
     selectedTemplate: toSelectedTemplateSummary(selected),
     auth,
-    message: "Selected template view payload is ready.",
-    diagnostics
+    message: 'Selected template view payload is ready.',
+    diagnostics,
   };
 }

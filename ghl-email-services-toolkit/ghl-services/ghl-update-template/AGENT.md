@@ -6,12 +6,12 @@ Container for template update pipeline services.
 ## Current Status
 Partially implemented.
 - view-content: implemented.
-- clone-content: planned.
+- clone-content: implemented.
 - inject-content: planned.
 
 ## Folder Roles
 - view-content: locate template by id/name and pull preview HTML.
-- clone-content: planned template-shell creation step.
+- clone-content: clone preview HTML from a base template into a new draft.
 - inject-content: planned content injection/update step.
 
 ## Routing Rules

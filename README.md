@@ -53,7 +53,10 @@ The repository also contains folders for cloning template content and injecting 
             ├── view-content/
             ├── clone-content/       # planned
             └── inject-content/      # planned
+└── nanoclaw/                        # reserved placeholder folder
 ```
+
+The repository also includes `AGENT.md` files across the toolkit folders to help route development work and clarify which areas are implemented versus still planned.
 
 ## Requirements
 

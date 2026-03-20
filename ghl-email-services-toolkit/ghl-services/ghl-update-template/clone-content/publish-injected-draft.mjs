@@ -1,394 +1,243 @@
-import { readdir, readFile, stat } from "node:fs/promises";
-import { dirname, extname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import {spawnSync} from 'node:child_process';
+import {readdir, readFile, stat} from 'node:fs/promises';
+import {dirname, extname, resolve} from 'node:path';
+import {fileURLToPath} from 'node:url';
 
-const BASE_URL = "https://services.leadconnectorhq.com";
-const API_VERSION = "2021-07-28";
+const BASE_URL = process.env.PUBLISH_INJECTED_DRAFT_BASE_URL
+  ? process.env.PUBLISH_INJECTED_DRAFT_BASE_URL
+  : 'https://services.leadconnectorhq.com';
+const API_VERSION = '2021-07-28';
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
-const envPath = resolve(currentDir, "../../authentication-ghl/.env");
-const injectionOutputDir = resolve(currentDir, "../inject-content/injection-output");
-
-const FALLBACK_FROM_NAME = "NYC Policy Scope";
-const FALLBACK_SUBJECT_LINE = "Weekly Newsletter Update";
-const FALLBACK_PREVIEW_TEXT = "Your latest updates are ready.";
+const cliPath = process.env.PUBLISH_INJECTED_DRAFT_CLI_PATH
+  ? resolve(process.cwd(), process.env.PUBLISH_INJECTED_DRAFT_CLI_PATH)
+  : resolve(currentDir, './src/clone-template.cli.ts');
+const envPath = process.env.PUBLISH_INJECTED_DRAFT_ENV_PATH
+  ? resolve(process.cwd(), process.env.PUBLISH_INJECTED_DRAFT_ENV_PATH)
+  : resolve(currentDir, '../../authentication-ghl/.env');
+const injectionOutputDir = process.env.PUBLISH_INJECTED_DRAFT_INJECTION_DIR
+  ? resolve(process.cwd(), process.env.PUBLISH_INJECTED_DRAFT_INJECTION_DIR)
+  : resolve(currentDir, '../inject-content/injection-output');
 
 function parseEnv(text) {
   const map = {};
   for (const line of text.split(/\r?\n/)) {
     const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const eq = trimmed.indexOf("=");
-    if (eq === -1) continue;
+    if (!trimmed || trimmed.startsWith('#')) {
+      continue;
+    }
+    const eq = trimmed.indexOf('=');
+    if (eq === -1) {
+      continue;
+    }
     const key = trimmed.slice(0, eq).trim();
     const value = trimmed.slice(eq + 1).trim();
-    map[key] = value.replace(/^['"]|['"]$/g, "");
+    map[key] = value.replace(/^['"]|['"]$/g, '');
   }
   return map;
 }
 
-function formatStamp(date = new Date()) {
-  const y = date.getUTCFullYear();
-  const m = String(date.getUTCMonth() + 1).padStart(2, "0");
-  const d = String(date.getUTCDate()).padStart(2, "0");
-  const hh = String(date.getUTCHours()).padStart(2, "0");
-  const mm = String(date.getUTCMinutes()).padStart(2, "0");
-  return `${y}-${m}-${d} ${hh}:${mm} UTC`;
+function extractJson(raw) {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function cleanSnippet(raw) {
+  if (typeof raw !== 'string') {
+    return null;
+  }
+  const normalized = raw.replace(/\s+/g, ' ').trim();
+  if (!normalized) {
+    return null;
+  }
+  return normalized.slice(0, 280);
 }
 
 async function findLatestInjectedHtml() {
-  const entries = await readdir(injectionOutputDir, { withFileTypes: true });
+  const entries = await readdir(injectionOutputDir, {withFileTypes: true});
   const htmlFiles = entries
-    .filter((entry) => entry.isFile() && extname(entry.name).toLowerCase() === ".html")
-    .map((entry) => entry.name);
+    .filter(entry => entry.isFile() && extname(entry.name).toLowerCase() === '.html')
+    .map(entry => entry.name);
 
   if (htmlFiles.length === 0) {
     throw new Error(`No injected HTML files found in ${injectionOutputDir}`);
   }
 
   const withTimes = await Promise.all(
-    htmlFiles.map(async (name) => {
+    htmlFiles.map(async name => {
       const path = resolve(injectionOutputDir, name);
       const fileStat = await stat(path);
-      return { name, path, mtimeMs: fileStat.mtimeMs };
-    })
+      return {name, path, mtimeMs: fileStat.mtimeMs};
+    }),
   );
 
   withTimes.sort((a, b) => b.mtimeMs - a.mtimeMs);
   return withTimes[0];
 }
 
-async function callApi(url, token, method, body) {
+async function callApi(url, token, body) {
   const response = await fetch(url, {
-    method,
+    method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
       Version: API_VERSION,
-      Accept: "application/json",
-      "Content-Type": "application/json"
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
     },
-    body: body ? JSON.stringify(body) : undefined,
-    signal: AbortSignal.timeout(12000)
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(12_000),
   });
 
   const text = await response.text();
-  let data;
-  try {
-    data = text ? JSON.parse(text) : {};
-  } catch {
-    data = { raw: text };
-  }
-
-  return { ok: response.ok, status: response.status, data };
-}
-
-async function cleanupTemplate({ token, locationId, templateId }) {
-  if (!templateId) {
-    return {
-      attempted: false,
-      ok: false,
-      status: null,
-      data: { message: "No templateId provided for cleanup." }
-    };
-  }
-
-  const result = await callApi(
-    `${BASE_URL}/emails/builder/${locationId}/${templateId}`,
-    token,
-    "DELETE"
-  );
+  const data = extractJson(text) || {raw: text};
 
   return {
-    attempted: true,
-    ok: result.ok,
-    status: result.status,
-    data: result.data
-  };
-}
-
-async function verifyTemplateName({ token, locationId, templateId }) {
-  const fetchList = await callApi(
-    `${BASE_URL}/emails/builder?locationId=${encodeURIComponent(locationId)}&limit=200`,
-    token,
-    "GET"
-  );
-
-  if (!fetchList.ok) {
-    return {
-      ok: false,
-      status: fetchList.status,
-      verifiedName: null,
-      template: null,
-      data: fetchList.data
-    };
-  }
-
-  const builders = Array.isArray(fetchList.data?.builders)
-    ? fetchList.data.builders
-    : [];
-  const hit = builders.find((builder) => builder?.id === templateId) || null;
-
-  return {
-    ok: true,
-    status: fetchList.status,
-    verifiedName: hit?.name ?? null,
-    template: hit,
-    data: fetchList.data
-  };
-}
-
-function failResult({
-  message,
-  failureStage,
-  locationId,
-  templateId = null,
-  requestedName = null,
-  verifiedName = null,
-  createStatus = null,
-  updateStatus = null,
-  patchStatus = null,
-  verifyStatus = null,
-  cleanup = null,
-  details = null
-}) {
-  return {
-    ok: false,
-    message,
-    failureStage,
-    locationId,
-    templateId,
-    requestedName,
-    verifiedName,
-    createStatus,
-    updateStatus,
-    patchStatus,
-    verifyStatus,
-    cleanup,
-    details
+    ok: response.ok,
+    status: response.status,
+    data,
+    responseSnippet: typeof text === 'string' ? text.slice(0, 280) : null,
   };
 }
 
 async function main() {
-  const envRaw = await readFile(envPath, "utf-8");
+  const latestInjected = await findLatestInjectedHtml();
+  const injectedHtml = await readFile(latestInjected.path, 'utf-8');
+
+  const clone = spawnSync(
+    process.execPath,
+    ['--import', 'tsx', cliPath, ...process.argv.slice(2)],
+    {
+      cwd: currentDir,
+      encoding: 'utf8',
+    },
+  );
+
+  if (clone.error) {
+    process.stdout.write(
+      `${JSON.stringify(
+        {
+          ok: false,
+          message: clone.error.message,
+          stage: 'cloneDraft',
+          diagnostics: {
+            stdout: cleanSnippet(clone.stdout),
+            stderr: cleanSnippet(clone.stderr),
+          },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    process.exitCode = 1;
+    return;
+  }
+
+  const cloneOutput = extractJson(clone.stdout || '');
+  if (!cloneOutput || typeof cloneOutput !== 'object') {
+    process.stdout.write(
+      `${JSON.stringify(
+        {
+          ok: false,
+          message:
+            clone.status === 0
+              ? 'Clone step did not return valid JSON.'
+              : 'Clone step failed before returning valid JSON.',
+          stage: 'cloneDraft',
+          status: clone.status === null ? 1 : clone.status,
+          diagnostics: {
+            stdout: cleanSnippet(clone.stdout),
+            stderr: cleanSnippet(clone.stderr),
+          },
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    process.exitCode = 1;
+    return;
+  }
+
+  if (!cloneOutput.ok || !cloneOutput.clonedTemplate?.id) {
+    process.stdout.write(`${JSON.stringify(cloneOutput, null, 2)}\n`);
+    process.exitCode = clone.status === null ? 1 : clone.status;
+    return;
+  }
+
+  const envRaw = await readFile(envPath, 'utf-8');
   const env = parseEnv(envRaw);
-  const token = env.GHL_PRIVATE_INTEGRATION_TOKEN || process.env.GHL_PRIVATE_INTEGRATION_TOKEN;
-  const locationId = env.GHL_LOCATION_ID || process.env.GHL_LOCATION_ID;
+  const token =
+    env.GHL_PRIVATE_INTEGRATION_TOKEN || process.env.GHL_PRIVATE_INTEGRATION_TOKEN;
+  const locationId =
+    cloneOutput.locationId || env.GHL_LOCATION_ID || process.env.GHL_LOCATION_ID;
 
   if (!token || !locationId) {
-    throw new Error("Missing GHL_PRIVATE_INTEGRATION_TOKEN or GHL_LOCATION_ID.");
-  }
-
-  const latestInjected = await findLatestInjectedHtml();
-  const injectedHtml = await readFile(latestInjected.path, "utf-8");
-
-  const requestedName = `Draft | NYCPolicyScopeBase | Injected | ${formatStamp()}`;
-
-  let templateId = null;
-  const create = await callApi(
-    `${BASE_URL}/emails/builder`,
-    token,
-    "POST",
-    {
-      name: requestedName,
-      locationId,
-      type: "html"
-    }
-  );
-
-  if (!create.ok) {
     process.stdout.write(
       `${JSON.stringify(
-        failResult({
-          message: `Create draft failed (${create.status}).`,
-          failureStage: "create",
-          locationId,
-          requestedName,
-          createStatus: create.status,
-          details: create.data
-        }),
+        {
+          ok: false,
+          message: 'Missing GHL_PRIVATE_INTEGRATION_TOKEN or GHL_LOCATION_ID.',
+          stage: 'publishInjectedHtml',
+          sourceInjectedHtml: latestInjected.path,
+        },
         null,
-        2
-      )}\n`
+        2,
+      )}\n`,
     );
     process.exitCode = 1;
     return;
   }
 
-  templateId = create.data?.id || create.data?.redirect;
-  if (!templateId) {
-    process.stdout.write(
-      `${JSON.stringify(
-        failResult({
-          message: "Create draft response missing template id.",
-          failureStage: "create",
-          locationId,
-          requestedName,
-          createStatus: create.status,
-          details: create.data
-        }),
-        null,
-        2
-      )}\n`
-    );
-    process.exitCode = 1;
-    return;
-  }
-
-  const update = await callApi(
-    `${BASE_URL}/emails/builder/data`,
-    token,
-    "POST",
-    {
-      locationId,
-      templateId,
-      html: injectedHtml,
-      editorType: "html",
-      updatedBy: "Codex Draft Publisher"
-    }
-  );
-
-  if (!update.ok) {
-    const cleanup = await cleanupTemplate({ token, locationId, templateId });
-    process.stdout.write(
-      `${JSON.stringify(
-        failResult({
-          message: `Update draft content failed (${update.status}).`,
-          failureStage: "updateHtml",
-          locationId,
-          templateId,
-          requestedName,
-          createStatus: create.status,
-          updateStatus: update.status,
-          cleanup,
-          details: update.data
-        }),
-        null,
-        2
-      )}\n`
-    );
-    process.exitCode = 1;
-    return;
-  }
-
-  const patchRename = await callApi(
-    `${BASE_URL}/emails/builder/${templateId}`,
-    token,
-    "PATCH",
-    {
-      locationId,
-      name: requestedName,
-      fromName: FALLBACK_FROM_NAME,
-      subjectLine: FALLBACK_SUBJECT_LINE,
-      previewText: FALLBACK_PREVIEW_TEXT
-    }
-  );
-
-  if (!patchRename.ok) {
-    const cleanup = await cleanupTemplate({ token, locationId, templateId });
-    process.stdout.write(
-      `${JSON.stringify(
-        failResult({
-          message: `Rename patch failed (${patchRename.status}).`,
-          failureStage: "patchRename",
-          locationId,
-          templateId,
-          requestedName,
-          createStatus: create.status,
-          updateStatus: update.status,
-          patchStatus: patchRename.status,
-          cleanup,
-          details: patchRename.data
-        }),
-        null,
-        2
-      )}\n`
-    );
-    process.exitCode = 1;
-    return;
-  }
-
-  const verify = await verifyTemplateName({ token, locationId, templateId });
-  if (!verify.ok) {
-    const cleanup = await cleanupTemplate({ token, locationId, templateId });
-    process.stdout.write(
-      `${JSON.stringify(
-        failResult({
-          message: `Name verification fetch failed (${verify.status}).`,
-          failureStage: "verifyName",
-          locationId,
-          templateId,
-          requestedName,
-          createStatus: create.status,
-          updateStatus: update.status,
-          patchStatus: patchRename.status,
-          verifyStatus: verify.status,
-          cleanup,
-          details: verify.data
-        }),
-        null,
-        2
-      )}\n`
-    );
-    process.exitCode = 1;
-    return;
-  }
-
-  const verifiedName = verify.verifiedName;
-  if (!verifiedName || verifiedName !== requestedName) {
-    const cleanup = await cleanupTemplate({ token, locationId, templateId });
-    process.stdout.write(
-      `${JSON.stringify(
-        failResult({
-          message: "Template name was not persisted exactly in GHL UI.",
-          failureStage: "verifyName",
-          locationId,
-          templateId,
-          requestedName,
-          verifiedName,
-          createStatus: create.status,
-          updateStatus: update.status,
-          patchStatus: patchRename.status,
-          verifyStatus: verify.status,
-          cleanup,
-          details: verify.template
-        }),
-        null,
-        2
-      )}\n`
-    );
-    process.exitCode = 1;
-    return;
-  }
+  const publish = await callApi(`${BASE_URL}/emails/builder/data`, token, {
+    locationId,
+    templateId: cloneOutput.clonedTemplate.id,
+    html: injectedHtml,
+    editorType: 'html',
+    updatedBy: 'publish-injected-draft',
+  });
 
   const result = {
-    ok: true,
-    locationId,
-    templateId,
-    requestedName,
-    verifiedName,
-    createStatus: create.status,
-    updateStatus: update.status,
-    patchStatus: patchRename.status,
-    verifyStatus: verify.status,
+    ok: publish.ok,
+    stage: publish.ok ? null : 'publishInjectedHtml',
+    message: publish.ok
+      ? 'Draft created and overwritten with latest injected HTML.'
+      : `Injected HTML publish failed (${publish.status}).`,
     sourceInjectedHtml: latestInjected.path,
-    failureStage: null,
-    previewUrl: update.data?.previewUrl ?? null,
-    templateDataDownloadUrl: update.data?.templateDataDownloadUrl ?? null
+    sourceInjectedHtmlBytes: injectedHtml.length,
+    cloneDraft: cloneOutput,
+    publishInjectedHtml: {
+      status: publish.status,
+      responseSnippet: publish.responseSnippet,
+      data: publish.data,
+    },
+    templateId: cloneOutput.clonedTemplate.id,
+    previewUrl:
+      publish.data && typeof publish.data.previewUrl === 'string'
+        ? publish.data.previewUrl
+        : cloneOutput.clonedTemplate.previewUrl || null,
+    templateDataDownloadUrl:
+      publish.data && typeof publish.data.templateDataDownloadUrl === 'string'
+        ? publish.data.templateDataDownloadUrl
+        : cloneOutput.clonedTemplate.templateDataDownloadUrl || null,
   };
 
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+  process.exitCode = publish.ok ? 0 : 1;
 }
 
-main().catch((error) => {
+main().catch(error => {
   process.stdout.write(
     `${JSON.stringify(
       {
         ok: false,
-        message: error instanceof Error ? error.message : "Unknown clone-content error"
+        message:
+          error instanceof Error ? error.message : 'Unknown publish-injected-draft error',
       },
       null,
-      2
-    )}\n`
+      2,
+    )}\n`,
   );
   process.exitCode = 1;
 });

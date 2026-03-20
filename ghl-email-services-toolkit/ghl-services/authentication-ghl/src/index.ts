@@ -1,9 +1,7 @@
-export {
-  checkGhlConnectionFromEnv
-} from "./checkGhlConnection.js";
+export {checkGhlConnectionFromEnv} from './checkGhlConnection.js';
 export type {
   GhlConnectionErrorCode,
   GhlConnectionResult,
   ProbeDiagnostics,
-  ProbeResult
-} from "./checkGhlConnection.js";
+  ProbeResult,
+} from './checkGhlConnection.js';

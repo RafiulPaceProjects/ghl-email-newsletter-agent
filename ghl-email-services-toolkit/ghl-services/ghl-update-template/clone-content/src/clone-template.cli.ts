@@ -1,8 +1,8 @@
-import {viewPreviewUrlDumpFromEnv} from './viewPreviewUrl.js';
+import {cloneTemplateFromEnv} from './cloneTemplate.js';
 
 function parseArgValue(
   args: string[],
-  key: '--template-name' | '--template-id',
+  key: '--template-name' | '--template-id' | '--draft-name',
 ): string | undefined {
   const withEqualsPrefix = `${key}=`;
   const withEquals = args.find(arg => arg.startsWith(withEqualsPrefix));
@@ -22,10 +22,12 @@ async function run(): Promise<void> {
   const args = process.argv.slice(2);
   const templateName = parseArgValue(args, '--template-name');
   const templateId = parseArgValue(args, '--template-id');
+  const draftName = parseArgValue(args, '--draft-name');
 
-  const result = await viewPreviewUrlDumpFromEnv({
+  const result = await cloneTemplateFromEnv({
     templateName,
     templateId,
+    draftName,
   });
 
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
@@ -45,6 +47,14 @@ run().catch((error: unknown) => {
         previewFetch: {
           status: null,
           responseSnippet: message,
+        },
+        createRequest: {
+          status: null,
+          responseSnippet: null,
+        },
+        updateRequest: {
+          status: null,
+          responseSnippet: null,
         },
       },
       null,

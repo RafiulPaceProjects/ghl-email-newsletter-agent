@@ -1,33 +1,40 @@
 # AGENT.md
 
 ## Purpose
-Planned service for creating a new template shell before content injection.
+Service for creating a new draft template by cloning HTML from a base
+template preview URL.
 
 ## Current Status
-Planned only. No implementation files exist yet.
+Implemented and active.
 
 ## Intended Responsibility
-- Implement template creation using POST /emails/builder.
-- Accept input describing new template metadata.
-- Return created templateId and minimal metadata for downstream steps.
+- Select a base template by id or name.
+- Fetch HTML from the selected template preview URL.
+- Create a new draft template using POST /emails/builder.
+- Push the fetched HTML into the new template with POST /emails/builder/data.
+- Return created template metadata for downstream steps.
 
 ## Expected Inputs
 - locationId (from shared env)
 - auth token (from shared env)
-- template name and optional metadata fields
+- base template name or template id
+- optional draft name override
 
 ## Expected Outputs
 - Structured JSON with ok/status/message/errorCode.
-- createdTemplate summary including templateId/name.
+- baseTemplate summary and clonedTemplate summary.
 
 ## Integration Dependencies
 - Must reuse auth checks from authentication-ghl.
-- Should align request semantics with endpoint docs in ghl-email-endpoints-reference/create-new-template.md.
+- Must reuse template lookup behavior from view-content.
+- Should align request semantics with endpoint docs in
+  ghl-email-endpoints-reference/create-new-template.md.
 
-## Guardrails for Future Implementation
+## Guardrails
 - Keep CLI contract machine-readable and consistent with other services.
 - Validate required fields before making API calls.
 - Include HTTP-specific error mapping and diagnostics snippets.
+- Treat preview HTML as the source payload for the clone step only.
 
 ## Routing Rule
-- Route any "create template" feature work to this folder.
+- Route any "clone template into a new draft" feature work to this folder.
