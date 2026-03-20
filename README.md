@@ -1,0 +1,1 @@
+# ghl-email-newsletter-agent
