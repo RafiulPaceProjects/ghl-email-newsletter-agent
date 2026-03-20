@@ -40,6 +40,7 @@ Service for fetching email-template metadata from GoHighLevel and saving a local
 - `MISSING_LOCATION_ID`
 - `FETCH_FAILED`
 - `NETWORK_ERROR`
+- `WRITE_ERROR`
 - `UNKNOWN_ERROR`
 
 ## Output Contract

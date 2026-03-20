@@ -25,6 +25,7 @@ export type FetchTemplatesErrorCode =
   | 'MISSING_LOCATION_ID'
   | 'FETCH_FAILED'
   | 'NETWORK_ERROR'
+  | 'WRITE_ERROR'
   | 'UNKNOWN_ERROR';
 
 export interface FetchTemplatesDiagnostics {
@@ -276,12 +277,28 @@ export async function fetchAndSaveTemplatesFromEnv(): Promise<FetchAndSaveTempla
   };
 
   const outputDir = dirname(OUTPUT_FILE_PATH);
-  await mkdir(outputDir, {recursive: true});
-  await writeFile(
-    OUTPUT_FILE_PATH,
-    `${JSON.stringify(filePayload, null, 2)}\n`,
-    'utf-8',
-  );
+  try {
+    await mkdir(outputDir, {recursive: true});
+    await writeFile(
+      OUTPUT_FILE_PATH,
+      `${JSON.stringify(filePayload, null, 2)}\n`,
+      'utf-8',
+    );
+  } catch (error) {
+    const snippet =
+      error instanceof Error ? cleanSnippet(error.message) : 'Unknown error';
+    return {
+      ...result,
+      outputPath: OUTPUT_FILE_PATH,
+      fileWritten: false,
+      errorCode: 'WRITE_ERROR',
+      message: 'Template fetch succeeded but file write failed.',
+      diagnostics: {
+        status: result.diagnostics.status,
+        responseSnippet: snippet,
+      },
+    };
+  }
 
   return {
     ...result,
