@@ -461,6 +461,26 @@ export async function viewPreviewUrlDumpFromEnv(
     };
   }
 
+  let dump: PreviewDumpPayload;
+  try {
+    dump = buildDumpPayload(fetchedAt, selectedTemplate, html);
+  } catch (error) {
+    const snippet =
+      error instanceof Error ? cleanSnippet(error.message) : "Unknown error";
+    return {
+      ok: false,
+      fetchedAt,
+      locationId: viewResult.locationId,
+      selectedTemplate,
+      previewFetch: {
+        status: fetchDiagnostics.status,
+        responseSnippet: snippet
+      },
+      message: "Failed to parse preview HTML.",
+      errorCode: "PARSE_ERROR" as const
+    };
+  }
+
   try {
     await mkdir(PREVIEWS_DIR, { recursive: true });
     const fileStamp = formatTimestampForFile(new Date(fetchedAt));
@@ -475,6 +495,7 @@ export async function viewPreviewUrlDumpFromEnv(
       selectedTemplate,
       outputPath,
       previewFetch: fetchDiagnostics,
+      dump,
       message: "Preview HTML saved successfully."
     };
   } catch (error) {
@@ -489,6 +510,7 @@ export async function viewPreviewUrlDumpFromEnv(
         status: fetchDiagnostics.status,
         responseSnippet: snippet
       },
+      dump,
       message: "Failed to write preview dump file.",
       errorCode: "WRITE_ERROR"
     };

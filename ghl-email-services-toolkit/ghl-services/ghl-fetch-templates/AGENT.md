@@ -30,6 +30,7 @@ Implemented and active.
 - MISSING_LOCATION_ID
 - FETCH_FAILED
 - NETWORK_ERROR
+- WRITE_ERROR
 - UNKNOWN_ERROR
 
 ## Output Contract
