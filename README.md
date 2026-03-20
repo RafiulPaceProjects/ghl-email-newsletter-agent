@@ -1,47 +1,82 @@
+<a id="readme-top"></a>
+
 # GHL Email Newsletter Agent
 
-A small TypeScript toolkit for working with GoHighLevel email templates from the command line.
+A GoHighLevel email-template toolkit for validating access, fetching template inventory, inspecting templates, downloading preview HTML, injecting a sample newsletter block into a local preview artifact, and cloning or publishing updated drafts through focused CLI packages.
 
-This repository is focused on a practical newsletter workflow:
+## Table of Contents
 
-1. verify that your GoHighLevel credentials and location access work,
-2. fetch the templates available in a location,
-3. inspect a specific template by name or ID, and
-4. download that template's preview HTML for analysis or downstream processing.
+- [About The Project](#about-the-project)
+  - [Current Status](#current-status)
+  - [Built With](#built-with)
+- [Repository Layout](#repository-layout)
+- [Getting Started](#getting-started)
+  - [Prerequisites](#prerequisites)
+  - [Installation](#installation)
+  - [Environment Setup](#environment-setup)
+- [Usage](#usage)
+  - [Recommended Workflow](#recommended-workflow)
+  - [Available Commands](#available-commands)
+  - [Outputs](#outputs)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
+- [Acknowledgments](#acknowledgments)
 
-At the moment, the repository is strongest on **read / inspect** workflows. The create and update endpoint notes are included as reference material, while some write-oriented implementation folders are still planned rather than complete.
+## About The Project
 
-## What this repo includes
+This repository contains a staged GoHighLevel newsletter workflow. Instead of one monolithic CLI, the implementation is split into small packages that each own a specific step:
 
-The main toolkit lives in `ghl-email-services-toolkit/` and is split into two parts:
+1. validate token and location access,
+2. fetch template inventory,
+3. resolve a template and inspect its preview HTML,
+4. inject one local sample newsletter block into a saved preview artifact, and
+5. either clone that template into a new HTML draft or publish the newest injected artifact into a freshly cloned draft.
 
-- **`ghl-email-endpoints-reference/`** — markdown notes describing the relevant GoHighLevel email template endpoints.
-- **`ghl-services/`** — executable TypeScript services and CLI entry points.
+The main code lives in `ghl-email-services-toolkit/`, with package-level scripts and implementation notes inside the toolkit itself.
 
-### Implemented services
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-- **Authentication check**
-  - Validates that the configured token and location can reach the expected GoHighLevel endpoints.
-- **Fetch templates**
-  - Pulls template metadata from the email builder API.
-  - Saves a JSON snapshot locally for reuse.
-- **View template**
-  - Finds a template by ID or exact name match.
-  - Returns a concise summary of the selected template.
-- **View preview URL**
-  - Fetches the selected template's preview HTML.
-  - Saves the HTML locally for review.
+### Current Status
 
-### Planned / partial areas
+The repository is currently strongest as a practical MVP for **template access, discovery, preview inspection, draft cloning, and publish-wrapper experiments**.
 
-The repository also contains folders for cloning template content and injecting newsletter content, but those are not yet full production-ready services. Treat them as work-in-progress until their implementation is completed.
+What is working now:
 
-## Repository structure
+- Authentication checks against the required GoHighLevel endpoints.
+- Template inventory fetches saved to local JSON.
+- Template selection by exact ID or case-insensitive name.
+- Preview HTML download plus lightweight structural analysis.
+- Draft cloning through the email builder create/update flow.
+- Local newsletter injection using a single explicit `[[[NEWSLETTER_BODY_SLOT]]]` token.
+- A publish wrapper that clones a fresh draft and overwrites it with the newest injected HTML artifact on disk.
+
+What is still limited or partial:
+
+- There is **no single top-level CLI** that runs the whole flow end to end.
+- The injection step currently supports **one bundled sample block**, not a full multi-block newsletter schema.
+- The publish wrapper always chooses the **newest** injected HTML file rather than an explicitly selected artifact path.
+- Generated operational artifacts are written inside the repository tree.
+
+### Built With
+
+- Node.js 20+
+- TypeScript
+- `tsx`
+- `dotenv`
+- `gts`
+- Node's built-in test runner
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+## Repository Layout
 
 ```text
 .
 ├── README.md
 └── ghl-email-services-toolkit/
+    ├── README.md
+    ├── CODEBASE-NOTES.md
+    ├── package.json
     ├── ghl-email-endpoints-reference/
     │   ├── templates-fetch.md
     │   ├── create-new-template.md
@@ -51,212 +86,155 @@ The repository also contains folders for cloning template content and injecting 
         ├── ghl-fetch-templates/
         └── ghl-update-template/
             ├── view-content/
-            ├── clone-content/       # planned
-            └── inject-content/      # planned
-└── nanoclaw/                        # reserved placeholder folder
+            ├── inject-content/
+            └── clone-content/
 ```
 
-The repository also includes `AGENT.md` files across the toolkit folders to help route development work and clarify which areas are implemented versus still planned.
+Package responsibilities:
 
-## Requirements
+- `authentication-ghl/` — validates token and location access.
+- `ghl-fetch-templates/` — fetches and saves template inventory.
+- `ghl-update-template/view-content/` — selects templates and downloads preview HTML.
+- `ghl-update-template/inject-content/` — performs local single-slot HTML injection.
+- `ghl-update-template/clone-content/` — clones templates and provides the publish wrapper.
+- `ghl-email-endpoints-reference/` — request-shape and endpoint behavior notes.
 
-- **Node.js 20+**
+## Getting Started
+
+### Prerequisites
+
+- Node.js 20 or newer
 - npm
-- A valid **GoHighLevel Private Integration Token** with access to the relevant location
-- A valid **GoHighLevel location ID**
+- A GoHighLevel Private Integration Token
+- A GoHighLevel location ID
 
-## Environment setup
+### Installation
 
-The services share environment values from:
+The toolkit uses package-local installs. From the repository root:
 
-```text
-ghl-email-services-toolkit/ghl-services/authentication-ghl/.env
+```bash
+npm --prefix ghl-email-services-toolkit/ghl-services/authentication-ghl install
+npm --prefix ghl-email-services-toolkit/ghl-services/ghl-fetch-templates install
+npm --prefix ghl-email-services-toolkit/ghl-services/ghl-update-template/view-content install
+npm --prefix ghl-email-services-toolkit/ghl-services/ghl-update-template/clone-content install
+npm --prefix ghl-email-services-toolkit/ghl-services/ghl-update-template/inject-content install
 ```
 
-Create that file with at least:
+### Environment Setup
+
+Create the shared env file from the example:
+
+```bash
+cp ghl-email-services-toolkit/ghl-services/authentication-ghl/.env.example \
+  ghl-email-services-toolkit/ghl-services/authentication-ghl/.env
+```
+
+Set at least:
 
 ```bash
 GHL_PRIVATE_INTEGRATION_TOKEN=your_token_here
 GHL_LOCATION_ID=your_location_id_here
 ```
 
-## Install dependencies
+All implemented packages reuse this shared env contract.
 
-Each service is an independent Node package, so install dependencies inside the package you want to run.
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-### 1) Authentication service
+## Usage
 
-```bash
-cd ghl-email-services-toolkit/ghl-services/authentication-ghl
-npm install
-```
+### Recommended Workflow
 
-### 2) Template fetch service
+1. **Validate authentication and scope**
 
-```bash
-cd ghl-email-services-toolkit/ghl-services/ghl-fetch-templates
-npm install
-```
+   ```bash
+   npm --prefix ghl-email-services-toolkit/ghl-services/authentication-ghl run check:connection
+   ```
 
-### 3) Template view / preview service
+2. **Fetch template inventory when you need a fresh snapshot**
 
-```bash
-cd ghl-email-services-toolkit/ghl-services/ghl-update-template/view-content
-npm install
-```
+   ```bash
+   npm --prefix ghl-email-services-toolkit/ghl-services/ghl-fetch-templates run fetch:templates
+   ```
 
-## Quick start
+3. **Inspect a template by name or ID**
 
-A typical workflow looks like this.
+   ```bash
+   npm --prefix ghl-email-services-toolkit/ghl-services/ghl-update-template/view-content run view:template -- --template-name="Weekly Newsletter"
+   npm --prefix ghl-email-services-toolkit/ghl-services/ghl-update-template/view-content run view:template -- --template-id="template_123"
+   ```
 
-### Step 1: Verify connectivity
+4. **Download preview HTML for local review**
 
-```bash
-cd ghl-email-services-toolkit/ghl-services/authentication-ghl
-npm run check:connection
-```
+   ```bash
+   npm --prefix ghl-email-services-toolkit/ghl-services/ghl-update-template/view-content run view:preview-url -- --template-id="template_123"
+   ```
 
-Expected behavior:
+5. **Inject the bundled sample newsletter block into a local preview HTML file**
 
-- prints structured JSON,
-- returns exit code `0` on success,
-- returns exit code `1` when authentication, scope, location, or network checks fail.
+   ```bash
+   node ghl-email-services-toolkit/ghl-services/ghl-update-template/inject-content/inject-sample.mjs --preview-html ./path/to/preview.html
+   ```
 
-### Step 2: Fetch templates for the location
+6. **Clone a draft or publish the newest injected artifact**
 
-```bash
-cd ../ghl-fetch-templates
-npm run fetch:templates
-```
+   ```bash
+   npm --prefix ghl-email-services-toolkit/ghl-services/ghl-update-template/clone-content run clone:template -- --template-id="template_123" --draft-name="Newsletter Draft"
+   node ghl-email-services-toolkit/ghl-services/ghl-update-template/clone-content/publish-injected-draft.mjs --template-id="template_123" --draft-name="Newsletter Draft"
+   ```
 
-This command:
+### Available Commands
 
-- reuses the shared `.env` file,
-- checks authentication before attempting the fetch,
-- calls the GoHighLevel email builder endpoint, and
-- writes a snapshot to:
-
-```text
-ghl-email-services-toolkit/ghl-services/ghl-fetch-templates/data/templates.json
-```
-
-### Step 3: View a specific template
-
-By name:
+From `ghl-email-services-toolkit/` you can also run the cross-package maintenance scripts:
 
 ```bash
-cd ../ghl-update-template/view-content
-npm run view:template -- --template-name "Weekly Newsletter"
-```
-
-By ID:
-
-```bash
-npm run view:template -- --template-id "template_123"
+npm run test
+npm run lint
+npm run typecheck
+npm run validate
+npm run fix
 ```
 
 Notes:
 
-- Name matching is exact after trimming and lowercasing.
-- If you do not pass a name or ID, the service falls back to its current default template name.
+- `validate` runs `typecheck`, `test`, then `lint`.
+- Root `typecheck` covers the TypeScript packages.
+- `inject-content` participates in `test`, `lint`, and `fix`, but not the root `typecheck` script.
 
-### Step 4: Download preview HTML
+### Outputs
 
-By name:
+The workflow produces machine-readable JSON plus local artifacts, including:
 
-```bash
-npm run view:preview-url -- --template-name "Weekly Newsletter"
-```
+- `ghl-email-services-toolkit/ghl-services/ghl-fetch-templates/data/templates.json`
+- `ghl-email-services-toolkit/ghl-services/ghl-update-template/view-content/previews/`
+- `ghl-email-services-toolkit/ghl-services/ghl-update-template/inject-content/injection-output/`
 
-By ID:
+These are operational outputs and should usually stay uncommitted.
 
-```bash
-npm run view:preview-url -- --template-id "template_123"
-```
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-This command saves the fetched HTML into:
+## Roadmap
 
-```text
-ghl-email-services-toolkit/ghl-services/ghl-update-template/view-content/previews/
-```
+- Add a true end-to-end orchestration command for the staged workflow.
+- Support structured newsletter input with repeatable ordered blocks.
+- Add optional image and CTA handling for newsletter sections.
+- Allow explicit selection of which injected HTML artifact should be published.
+- Continue refining endpoint reference notes as API behavior becomes clearer.
 
-## Available commands
+## Contributing
 
-### `authentication-ghl`
+Contributions that improve documentation clarity, package contracts, and low-risk workflow reliability are welcome.
 
-```bash
-npm run check:connection
-npm run typecheck
-```
+Before opening a change, it helps to:
 
-### `ghl-fetch-templates`
+1. keep docs aligned with the current implementation,
+2. avoid implying a single end-to-end CLI when the workflow is still split by package,
+3. avoid committing secrets or generated artifacts, and
+4. run the relevant package or root validation commands.
 
-```bash
-npm run fetch:templates
-npm run typecheck
-```
+## Acknowledgments
 
-### `ghl-update-template/view-content`
+- README structure adapted from [othneildrew/Best-README-Template](https://github.com/othneildrew/Best-README-Template).
+- GoHighLevel endpoint notes are documented in `ghl-email-services-toolkit/ghl-email-endpoints-reference/`.
+- Additional implementation status and handoff notes live in `ghl-email-services-toolkit/CODEBASE-NOTES.md`.
 
-```bash
-npm run view:template -- --template-name "..."
-npm run view:template -- --template-id "..."
-npm run view:preview-url -- --template-name "..."
-npm run view:preview-url -- --template-id "..."
-npm run typecheck
-```
-
-## Output behavior
-
-All implemented CLIs return structured JSON so they are easy to:
-
-- inspect manually,
-- pipe into logs,
-- parse in scripts, or
-- use in automation.
-
-Common response fields include:
-
-- `ok`
-- `message`
-- status and diagnostic details
-- location information
-- selected template information when applicable
-- error codes on failure
-
-## Endpoint reference docs
-
-If you need API context while building on top of this repo, start here:
-
-- `ghl-email-services-toolkit/ghl-email-endpoints-reference/templates-fetch.md`
-- `ghl-email-services-toolkit/ghl-email-endpoints-reference/create-new-template.md`
-- `ghl-email-services-toolkit/ghl-email-endpoints-reference/update-template.md`
-
-These notes summarize the intended GoHighLevel email-template workflow and known limitations of the publicly exposed endpoints.
-
-## Current limitations
-
-- The repository currently emphasizes **template discovery and inspection**, not full end-to-end template authoring.
-- Publicly accessible template APIs appear to expose metadata and preview-oriented workflows more clearly than full builder-content retrieval.
-- Create/update write flows are documented, but parts of the implementation are still planned.
-- Each service manages its own dependencies, so there is no single workspace-level install command yet.
-
-## Recommended usage pattern
-
-If you are using this repo to support a newsletter pipeline, the safest order is:
-
-1. run the authentication check,
-2. fetch templates,
-3. select the right template by ID or exact name,
-4. pull preview HTML for validation or analysis,
-5. add creation/update automation only after you have confirmed the exact payloads you need.
-
-## Future improvements
-
-Good next steps for this repository would be:
-
-- add a top-level workspace package or task runner,
-- include a root `.env.example`,
-- finish the clone/inject/update implementation path,
-- add automated tests for CLI contracts and API error handling,
-- document known-good request payloads for template creation and update.
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
