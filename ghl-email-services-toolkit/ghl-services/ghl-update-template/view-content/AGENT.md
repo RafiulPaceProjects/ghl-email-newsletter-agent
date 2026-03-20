@@ -1,26 +1,34 @@
 # AGENT.md
 
 ## Purpose
-Service for selecting a target template and optionally fetching and saving preview HTML for analysis.
+
+Service for selecting a target template and optionally fetching and saving
+preview HTML for analysis.
 
 ## How An Agent Should Use This Package
-- Use this package when the task is "find the right template" or "inspect preview HTML".
+
+- Use this package when the task is "find the right template" or "inspect
+  preview HTML".
 - Keep this package read-only with respect to the GHL template lifecycle.
-- Treat preview HTML as an analysis artifact, not as trusted publish state.
+- Treat preview HTML as analysis input and future render context, not as final
+  publish state.
 
 ## Entry Points
+
 - `src/viewTemplate.ts`: selection flow by template name or template id.
 - `src/viewPreviewUrl.ts`: preview URL fetch and HTML dump.
 - `src/view-template.cli.ts`: CLI for selection output.
 - `src/view-preview-url.cli.ts`: CLI for preview fetch and file save.
 
 ## Commands
+
 - `npm run view:template -- --template-name=<name>`
 - `npm run view:template -- --template-id=<id>`
 - `npm run view:preview-url -- --template-name=<name>`
 - `npm run view:preview-url -- --template-id=<id>`
 
 ## Inputs / Outputs / Contracts
+
 - Inputs:
   - shared env from `authentication-ghl/.env`
   - optional `templateName`
@@ -29,19 +37,33 @@ Service for selecting a target template and optionally fetching and saving previ
   - selected template summary
   - optional preview dump payload
   - preview HTML file under `previews/`
+  - structured preview information useful for slot validation and future render
+    planning
 
 ## Defaults
+
 - If no selector is provided, defaults to template name `nycpolicyscopebase`.
 
 ## Behavior Summary
+
 - Validates auth, token, and location before template queries.
 - Fetches builders from `GET /emails/builder` with `limit=100`.
-- Falls back to a name query and pagination when needed.
 - Supports case-insensitive name match and exact id match.
 - If preview flow succeeds, saves HTML under `previews/<templateId>-<timestamp>.html`.
-- Preview dumps include both raw HTML and a lightweight structural summary.
+- Extracts structural body/asset information that can help future final-render
+  planning.
+
+## Output Direction
+
+This package should feed:
+
+- current clone flow
+- future render planning in `inject-content`
+- future slot-validation or preview-shape analysis before research/image
+  injection work
 
 ## Error Codes (Selection)
+
 - `AUTH_CHECK_FAILED`
 - `MISSING_TOKEN`
 - `MISSING_LOCATION_ID`
@@ -55,6 +77,7 @@ Service for selecting a target template and optionally fetching and saving previ
 - `UNKNOWN_ERROR`
 
 ## Error Codes (Preview)
+
 - `SELECTION_FAILED`
 - `MISSING_PREVIEW_URL`
 - `INVALID_PREVIEW_URL`
@@ -64,12 +87,8 @@ Service for selecting a target template and optionally fetching and saving previ
 - `WRITE_ERROR`
 - `UNKNOWN_ERROR`
 
-## Output Contract
-- Selection returns `selectedTemplate` summary and diagnostics.
-- Preview flow returns `outputPath` when write succeeds.
-- Both CLIs return JSON and set a non-zero exit code on failure.
-
 ## Test Contract
+
 - Automated tests use Node's built-in test runner.
 - Primary coverage targets:
   - `src/viewTemplate.ts`
@@ -77,6 +96,7 @@ Service for selecting a target template and optionally fetching and saving previ
 - Keep CLI testing thin; most assertions belong on the exported functions.
 
 ## References
+
 - Package sources:
   - `./src/viewTemplate.ts`
   - `./src/viewPreviewUrl.ts`
@@ -89,6 +109,11 @@ Service for selecting a target template and optionally fetching and saving previ
   - `../../../ghl-email-endpoints-reference/update-template.md`
 
 ## Routing Rules
+
 - Route template lookup and validation tasks here.
-- Route preview HTML retrieval and basic DOM and asset extraction tasks here.
+- Route preview HTML retrieval and preview-structure inspection here.
 - Do not implement create or update API mutations in this folder.
+
+## Example
+
+- `npm --prefix ghl-services/ghl-update-template/view-content run view:preview-url -- --template-name="Weekly Update"`
