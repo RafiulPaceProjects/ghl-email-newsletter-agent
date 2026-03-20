@@ -13,7 +13,8 @@
     "fix": "gts fix",
     "test": "node --import tsx --test test/**/*.test.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "fetch:templates": "tsx src/fetch-templates.cli.ts"
+    "fetch:templates": "tsx src/fetch-templates.cli.ts",
+    "select:template": "tsx src/select-template.cli.ts"
   },
   "devDependencies": {
     "@types/node": "^24.4.0",
