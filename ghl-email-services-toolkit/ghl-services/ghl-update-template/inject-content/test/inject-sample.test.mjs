@@ -6,6 +6,12 @@ import {spawn} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {afterEach, test} from 'node:test';
 
+/**
+ * These tests pin down the current local-only injector contract:
+ * one preview HTML file in, one slot token replaced, one HTML artifact out.
+ * They intentionally do not model multi-block rendering yet because that
+ * feature does not exist in the implementation.
+ */
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const scriptPath = resolve(currentDir, '../inject-sample.mjs');
 const sampleBlockPath = resolve(currentDir, '../sample-newsletter-block.jinja.html');
@@ -18,6 +24,8 @@ async function makeTempDir() {
   return dir;
 }
 
+// Spawn the CLI exactly as a user would so stdout JSON and exit codes remain
+// part of the tested contract.
 async function runInjectSample(args, cwd) {
   return await new Promise((resolveResult, reject) => {
     const child = spawn(process.execPath, [scriptPath, ...args], {
@@ -52,6 +60,7 @@ afterEach(async () => {
   );
 });
 
+// Happy path: inject the bundled sample block into the single allowed slot.
 void test('succeeds with an explicit preview html file containing exactly one slot token', async () => {
   const tempDir = await makeTempDir();
   const previewPath = resolve(tempDir, 'preview.html');
@@ -73,6 +82,8 @@ void test('succeeds with an explicit preview html file containing exactly one sl
   assert.doesNotMatch(outputHtml, /\[\[\[NEWSLETTER_BODY_SLOT]]]/);
 });
 
+// Validation failures keep the current injector predictable before it writes an
+// artifact that downstream publish scripts might accidentally use.
 void test('fails when --preview-html is missing', async () => {
   const tempDir = await makeTempDir();
 

@@ -145,6 +145,8 @@ function parseAttrs(raw: string): Record<string, string> {
 }
 
 function extractBodyHtml(html: string): string {
+  // Prefer the `<body>` contents when present so structured block extraction
+  // focuses on the email payload rather than the full document wrapper.
   const bodyMatch = html.match(/<body\b[^>]*>([\s\S]*?)<\/body>/i);
   if (bodyMatch && bodyMatch[1]) {
     return bodyMatch[1];
@@ -340,6 +342,8 @@ function buildDumpPayload(
   selectedTemplate: SelectedTemplateSummary,
   html: string,
 ): PreviewDumpPayload {
+  // The dump keeps both the raw HTML and a lightweight structural summary so
+  // downstream analysis can inspect content without reparsing everything.
   const bodyHtml = extractBodyHtml(html);
   const blocks = toStructuredBlocks(bodyHtml);
   const assets = collectAssets(html, blocks);

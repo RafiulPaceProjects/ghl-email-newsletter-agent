@@ -1,3 +1,9 @@
+/**
+ * Clone flow core: select a base template through `view-content`, fetch its
+ * preview HTML, create a new draft shell, then overwrite that draft with the
+ * fetched HTML. The result object keeps each boundary visible so downstream
+ * agents can trace selection, preview fetch, create, and update separately.
+ */
 import {
   type SelectedTemplateSummary,
   viewSelectedTemplateFromEnv,
@@ -63,6 +69,8 @@ export interface CloneTemplateResult {
   errorCode?: CloneTemplateErrorCode;
 }
 
+// Normalize response text before storing it in diagnostics so error payloads
+// stay readable and bounded across preview, create, and update steps.
 function cleanSnippet(input: string): string {
   const normalized = input.replace(/\s+/g, ' ').trim();
   if (!normalized) {
@@ -74,6 +82,8 @@ function cleanSnippet(input: string): string {
   return `${normalized.slice(0, RESPONSE_SNIPPET_MAX_LENGTH)}...`;
 }
 
+// Use an explicit override when provided; otherwise stamp the derived draft
+// name with UTC time so repeated clones remain distinguishable.
 function buildDraftName(
   baseTemplate: SelectedTemplateSummary,
   override?: string,
@@ -93,6 +103,8 @@ function buildDraftName(
   return `${baseTemplate.name} Draft Copy ${y}-${m}-${d} ${hh}:${mm} UTC`;
 }
 
+// Keep HTTP-specific error mapping centralized so both mutation stages emit the
+// same external contract even when upstream API bodies vary.
 function mapMutationErrorCode(
   prefix: 'CREATE' | 'UPDATE',
   status: number,
@@ -112,6 +124,8 @@ function mapMutationErrorCode(
   return `${prefix}_FAILED`;
 }
 
+// Mutation responses sometimes return JSON and sometimes plain text; preserve
+// whichever shape arrives so later helpers can inspect it defensively.
 function parseResponseData(raw: string): unknown {
   if (!raw.trim()) {
     return {};
@@ -124,12 +138,15 @@ function parseResponseData(raw: string): unknown {
   }
 }
 
+// Convert unknown values into safe object access at the response boundary.
 function asObject(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object'
     ? (value as Record<string, unknown>)
     : {};
 }
 
+// Walk the common top-level and nested response shapes until a template id is
+// found. This keeps the clone step tolerant of small API shape differences.
 function extractTemplateId(data: unknown): string | null {
   const root = asObject(data);
   const directKeys = ['id', 'templateId', 'builderId', 'redirect'];
@@ -155,6 +172,8 @@ function extractTemplateId(data: unknown): string | null {
   return null;
 }
 
+// Pull the base template's preview HTML into memory before any mutation calls.
+// This isolates preview validation from create/update failures in diagnostics.
 async function fetchPreviewHtml(previewUrl: string): Promise<
   | {
       ok: true;
@@ -224,6 +243,8 @@ async function fetchPreviewHtml(previewUrl: string): Promise<
   }
 }
 
+// Wrap POST mutations so create and update share auth headers, timeout rules,
+// response parsing, and diagnostic snippet capture.
 async function callMutation(
   path: string,
   token: string,
@@ -262,6 +283,9 @@ export async function cloneTemplateFromEnv(
   options: CloneTemplateOptions = {},
 ): Promise<CloneTemplateResult> {
   const fetchedAt = new Date().toISOString();
+
+  // Delegate template selection to the existing view-content flow so this
+  // service only owns cloning, not lookup semantics.
   const selection = await viewSelectedTemplateFromEnv(options);
   const token = process.env.GHL_PRIVATE_INTEGRATION_TOKEN?.trim() ?? '';
   const locationId = process.env.GHL_LOCATION_ID?.trim() ?? '';
@@ -271,6 +295,7 @@ export async function cloneTemplateFromEnv(
     responseSnippet: null,
   };
 
+  // Fail fast when the upstream selection step cannot provide a base template.
   if (!selection.ok || !selection.selectedTemplate) {
     return {
       ok: false,
@@ -290,6 +315,7 @@ export async function cloneTemplateFromEnv(
     };
   }
 
+  // Validate env-driven auth context before doing preview or mutation work.
   if (!token) {
     return {
       ok: false,
@@ -324,6 +350,8 @@ export async function cloneTemplateFromEnv(
 
   const baseTemplate = selection.selectedTemplate;
   const previewUrl = baseTemplate.previewUrl?.trim();
+
+  // The preview URL is the handoff from selection into clone execution.
   if (!previewUrl) {
     return {
       ok: false,
@@ -340,6 +368,8 @@ export async function cloneTemplateFromEnv(
     };
   }
 
+  // Capture the source HTML first so later failures can still report how far
+  // the pipeline got and how much content was fetched.
   const previewFetch = await fetchPreviewHtml(previewUrl);
   if (!previewFetch.ok) {
     return {
@@ -365,6 +395,8 @@ export async function cloneTemplateFromEnv(
 
   let createRequest = emptyDiagnostics;
   try {
+    // Create an empty HTML draft first. The returned id becomes the key for
+    // the second mutation that uploads the fetched preview HTML.
     const create = await callMutation('/emails/builder', token, {
       locationId,
       name: draftName,
@@ -405,6 +437,8 @@ export async function cloneTemplateFromEnv(
       };
     }
 
+    // Reuse the fetched preview HTML verbatim as the new draft body so clone
+    // remains a transport step rather than a content transformation step.
     const update = await callMutation('/emails/builder/data', token, {
       locationId,
       templateId,
@@ -429,6 +463,8 @@ export async function cloneTemplateFromEnv(
       };
     }
 
+    // Surface the new template identity plus any API-returned preview URLs for
+    // downstream inject/publish steps.
     const updateData = asObject(update.data);
     return {
       ok: true,
@@ -457,6 +493,8 @@ export async function cloneTemplateFromEnv(
       message: 'Draft clone completed from base template preview HTML.',
     };
   } catch (error) {
+    // Network/runtime errors after preview fetch still preserve the completed
+    // diagnostics so callers can tell whether create or update failed.
     return {
       ok: false,
       fetchedAt,

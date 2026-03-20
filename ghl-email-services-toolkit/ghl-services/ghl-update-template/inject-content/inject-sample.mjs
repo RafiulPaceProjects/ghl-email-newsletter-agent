@@ -2,12 +2,24 @@ import {mkdir, readFile, stat, writeFile} from 'node:fs/promises';
 import {basename, dirname, extname, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
+/**
+ * Current inject-content implementation:
+ * - read a preview HTML file produced earlier in the pipeline
+ * - require exactly one explicit body slot token
+ * - replace that slot with one hardcoded sample newsletter block
+ * - write a timestamped HTML artifact for downstream publish experiments
+ *
+ * This is intentionally local-only. It does not parse structured newsletter
+ * data and it does not call the GHL update endpoint directly.
+ */
 const SLOT_TOKEN = '[[[NEWSLETTER_BODY_SLOT]]]';
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
 const outputDir = resolve(currentDir, 'injection-output');
 const sampleBlockPath = resolve(currentDir, 'sample-newsletter-block.jinja.html');
 
+// Match the timestamp style used by adjacent tooling so injection artifacts sort
+// cleanly and can be picked up by the clone-content publish wrapper.
 function toStamp(date = new Date()) {
   const y = date.getUTCFullYear();
   const m = String(date.getUTCMonth() + 1).padStart(2, '0');
@@ -18,6 +30,8 @@ function toStamp(date = new Date()) {
   return `${y}${m}${d}-${hh}${mm}${ss}`;
 }
 
+// Keep CLI parsing minimal for now: this utility only needs one required
+// argument and accepts either `--key value` or `--key=value`.
 function parseArgValue(args, key) {
   const withEqualsPrefix = `${key}=`;
   const withEquals = args.find(arg => arg.startsWith(withEqualsPrefix));
@@ -37,6 +51,8 @@ function countOccurrences(input, token) {
   return input.split(token).length - 1;
 }
 
+// Resolve and validate the preview HTML early so later stages can assume they
+// are operating on a real local `.html` file.
 async function resolvePreviewHtmlPath(rawPath) {
   if (!rawPath) {
     throw new Error('Missing required --preview-html argument.');
@@ -67,6 +83,9 @@ async function main() {
   const baseHtml = await readFile(previewHtmlPath, 'utf-8');
   const sampleBlock = await readFile(sampleBlockPath, 'utf-8');
 
+  // The current contract is one explicit insertion point. Multiple slots would
+  // make block ordering ambiguous; zero slots means there is nowhere safe to
+  // inject newsletter content.
   const slotTokenCount = countOccurrences(baseHtml, SLOT_TOKEN);
   if (slotTokenCount !== 1) {
     throw new Error(
@@ -74,6 +93,9 @@ async function main() {
     );
   }
 
+  // Today the inject step is a plain string replacement using a single sample
+  // block. Future newsletter support should replace this with a renderer that
+  // assembles validated repeatable blocks before injection.
   const finalHtml = baseHtml.replace(SLOT_TOKEN, sampleBlock);
 
   await mkdir(outputDir, {recursive: true});

@@ -4,29 +4,48 @@
 Shared routing guide for all service-level tests in `ghl-services`.
 Use this folder as the top-level entry point when the task is about test coverage, test structure, or cross-package verification.
 
+## How An Agent Should Think About Tests Here
+- The current repository uses Node's built-in test runner.
+- Most coverage should target importable functions, not CLI wrappers.
+- Use deterministic mocks and temp files instead of live GHL traffic.
+
+## Inputs / Outputs / Contracts
+- Inputs:
+  - package-local source modules
+  - mocked `global.fetch`, child-process boundaries, env state, and temp files
+- Outputs:
+  - package-local tests under each `test/` folder
+  - repeatable assertions over JSON contracts and side effects
+
 ## Scope
-- Package-local unit and integration-style tests under each service `test/` folder.
-- Test runner setup using Node's built-in test runner.
-- Shared testing conventions for mocks, fixtures, temp files, and side-effect control.
-- Style and quality checks driven by `gts`, `tsc`, and package scripts.
+- Shared testing conventions for mocks, fixtures, temp files, and side-effect control
+- Package-level validation commands driven by `gts`, `tsc`, and package scripts
+- Guidance for when to use direct function tests versus wrapper-level tests
 
-## Test Layout
-- `authentication-ghl/test`: auth probe behavior and error mapping.
-- `ghl-fetch-templates/test`: fetch workflow and snapshot persistence.
-- `ghl-update-template/view-content/test`: template selection and preview retrieval.
+## Current Conventions
+- Keep tests inside each package `test/` folder.
+- Use `node --import tsx --test` for TypeScript packages.
+- Use `node --test` for plain `.mjs` packages.
+- Restore `process.env`, `global.fetch`, and any filesystem changes between tests.
+- Use temp directories where practical.
+- Use a local HTTP server only when a wrapper test needs realistic request inspection.
 
-## Default Workflow
-1. Keep tests close to the package they validate.
-2. Prefer exported function tests over shelling out to CLIs unless CLI behavior is the target.
-3. Mock network calls deterministically.
-4. Restore environment variables and filesystem state after each test.
-5. Run `npm run fix`, `npm run typecheck`, `npm test`, and `npm run lint` in the touched package.
-
-## Guardrails
+## Constraints And Rules
 - Do not hit live GHL endpoints in automated tests.
 - Keep tests fast, isolated, and repeatable.
 - Avoid writing persistent artifacts unless the test also cleans them up.
-- When adding a new service package, add its `test/AGENT.md` alongside the first test file.
+- When adding a new service package, add its `test/AGENT.md` alongside the first test file if the package does not already have one.
 
-## Routing Rule
-- Route broad "add or improve tests" work here first, then continue into the specific package test folder.
+## References
+- `../authentication-ghl/test/checkGhlConnection.test.ts`
+- `../ghl-fetch-templates/test/fetchTemplates.test.ts`
+- `../ghl-update-template/view-content/test/viewTemplate.test.ts`
+- `../ghl-update-template/view-content/test/viewPreviewUrl.test.ts`
+- `../ghl-update-template/clone-content/test/cloneTemplate.test.ts`
+- `../ghl-update-template/clone-content/test/publishInjectedDraft.test.ts`
+- `../ghl-update-template/inject-content/test/inject-sample.test.mjs`
+- `../ghl-update-template/clone-content/DATAFLOW.md`
+
+## Example Commands
+- `npm run test`
+- `npm --prefix ghl-services/ghl-update-template/view-content test`

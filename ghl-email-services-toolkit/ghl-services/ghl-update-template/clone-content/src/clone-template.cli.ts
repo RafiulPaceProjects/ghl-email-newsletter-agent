@@ -1,5 +1,12 @@
+/**
+ * CLI wrapper for the clone flow. It only parses selectors and a draft-name
+ * override, then delegates the actual data movement to `cloneTemplateFromEnv`
+ * so the CLI output stays a thin JSON envelope around the service result.
+ */
 import {cloneTemplateFromEnv} from './cloneTemplate.js';
 
+// Support both `--flag value` and `--flag=value` so shell scripts can invoke
+// the clone flow without additional argument parsing helpers.
 function parseArgValue(
   args: string[],
   key: '--template-name' | '--template-id' | '--draft-name',
@@ -19,6 +26,7 @@ function parseArgValue(
 }
 
 async function run(): Promise<void> {
+  // Map CLI selectors directly onto the service options contract.
   const args = process.argv.slice(2);
   const templateName = parseArgValue(args, '--template-name');
   const templateId = parseArgValue(args, '--template-id');
@@ -35,6 +43,8 @@ async function run(): Promise<void> {
 }
 
 run().catch((error: unknown) => {
+  // Preserve a machine-readable failure payload even when execution fails
+  // before the service can return its normal result shape.
   const message =
     error instanceof Error ? error.message : 'Unexpected CLI error';
 

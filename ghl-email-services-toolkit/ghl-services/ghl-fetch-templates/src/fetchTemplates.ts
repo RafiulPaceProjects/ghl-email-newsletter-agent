@@ -92,6 +92,8 @@ function deriveTemplateCount(payload: unknown): number | null {
     return null;
   }
 
+  // The API has been observed returning either `builders[]` or `templates[]`
+  // across different callers and docs, so count defensively at the boundary.
   const record = payload as Record<string, unknown>;
 
   if (Array.isArray(record.builders)) {
@@ -112,6 +114,8 @@ function buildEndpoint(locationId: string): string {
 export async function fetchTemplatesFromEnv(): Promise<FetchTemplatesResult> {
   loadSharedEnv();
 
+  // Reuse the auth gate before attempting the inventory fetch so downstream
+  // consumers always receive both fetch diagnostics and auth context together.
   const auth = await checkGhlConnectionFromEnv();
   const fetchedAt = new Date().toISOString();
   const locationId = process.env.GHL_LOCATION_ID?.trim() ?? '';
@@ -251,6 +255,8 @@ export async function fetchTemplatesFromEnv(): Promise<FetchTemplatesResult> {
 export async function fetchAndSaveTemplatesFromEnv(): Promise<FetchAndSaveTemplatesResult> {
   const result = await fetchTemplatesFromEnv();
 
+  // Only persist successful, fully-formed fetches. Failure results still return
+  // the intended output path so callers can report where the snapshot would live.
   if (!result.ok || !result.payload || !result.locationId || !result.status) {
     return {
       ...result,

@@ -1,0 +1,9 @@
+node_modules/
+dist/
+coverage/
+.DS_Store
+
+ghl-services/authentication-ghl/.env
+ghl-services/**/previews/
+ghl-services/**/injection-output/
+ghl-services/**/data/templates.json

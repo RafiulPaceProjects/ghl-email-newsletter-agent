@@ -227,6 +227,8 @@ function mergeUniqueBuilders(
   base: GhlEmailBuilder[],
   incoming: GhlEmailBuilder[],
 ): GhlEmailBuilder[] {
+  // Later fetches may return overlapping builders from name queries or paged
+  // results, so collapse by id before continuing the search.
   const byId = new Map<string, GhlEmailBuilder>();
   for (const template of base) {
     byId.set(template.id, template);
@@ -426,6 +428,8 @@ export async function viewSelectedTemplateFromEnv(
   let selected = findSelectedTemplate(builders, searchedBy);
 
   if (!selected && searchedBy.type === 'name') {
+    // Try the API's name filter before walking the remaining pages so exact
+    // matches can resolve earlier and with less traffic when supported.
     const namePage = await fetchBuildersPage(token, locationId, {
       name: searchedBy.value,
     });
@@ -444,6 +448,8 @@ export async function viewSelectedTemplateFromEnv(
   if (!selected && apiTotal !== null && builders.length < apiTotal) {
     let offset = builders.length;
 
+    // Only fall through to pagination when the API told us there are more
+    // builders available than the first page returned.
     while (offset < apiTotal) {
       const page = await fetchBuildersPage(token, locationId, {
         limit: '100',

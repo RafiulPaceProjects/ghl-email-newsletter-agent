@@ -1,3 +1,8 @@
+/**
+ * Wrapper-script tests exercise the clone-then-publish boundary end to end
+ * using temp files and a local HTTP server so the dataflow stays observable
+ * without talking to live GoHighLevel services.
+ */
 import assert from 'node:assert/strict';
 import {mkdir, mkdtemp, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
@@ -13,12 +18,16 @@ const scriptPath = resolve(
 
 const tempDirs: string[] = [];
 
+// Each scenario gets its own workspace because the wrapper discovers the
+// latest injected HTML file from disk at runtime.
 async function makeTempDir(): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'publish-injected-draft-test-'));
   tempDirs.push(dir);
   return dir;
 }
 
+// Spawn the wrapper as a real child process so tests validate its JSON/stdout
+// contract, exit code propagation, and env/path override behavior together.
 async function runScript(options: {
   cwd: string;
   env?: NodeJS.ProcessEnv;
@@ -59,12 +68,16 @@ async function runScript(options: {
   });
 }
 
+// Remove all temp workspaces between tests so filesystem-discovery assertions
+// remain deterministic.
 test.afterEach(async () => {
   await Promise.all(
     tempDirs.splice(0).map(dir => rm(dir, {recursive: true, force: true})),
   );
 });
 
+// Happy path: a successful clone response should hand its template id into the
+// publish request, which then uploads the latest injected HTML artifact.
 void test('preserves successful child execution and returns success JSON', async () => {
   const tempDir = await makeTempDir();
   const cliPath = resolve(tempDir, 'fake-clone-success.mjs');
@@ -156,6 +169,8 @@ void test('preserves successful child execution and returns success JSON', async
   }
 });
 
+// If cloning already failed with structured JSON, the wrapper should return
+// that same JSON instead of masking the original failure stage.
 void test('preserves child failure exit code and JSON output', async () => {
   const tempDir = await makeTempDir();
   const cliPath = resolve(tempDir, 'fake-clone-failure.mjs');
@@ -193,6 +208,8 @@ void test('preserves child failure exit code and JSON output', async () => {
   });
 });
 
+// When the clone subprocess crashes before producing JSON, the wrapper owns
+// the failure response and includes stderr for debugging.
 void test('emits wrapper JSON when the child fails before returning JSON', async () => {
   const tempDir = await makeTempDir();
   const injectionDir = resolve(tempDir, 'injected');
