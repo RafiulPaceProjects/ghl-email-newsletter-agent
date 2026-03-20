@@ -7,6 +7,7 @@ Own the newsletter injection step for `ghl-update-template`.
 - Use this package for local newsletter artifact generation only.
 - Do not treat it as the live API publish layer.
 - Document missing newsletter features explicitly instead of implying they already exist.
+- Remember that downstream publishing currently happens through `clone-content/publish-injected-draft.mjs`.
 
 ## Current Status
 - `inject-sample.mjs` works today as a local HTML artifact generator.
@@ -32,21 +33,21 @@ Own the newsletter injection step for `ghl-update-template`.
 - Hand off publication responsibility to `../clone-content/publish-injected-draft.mjs`.
 
 ## Expected Inputs
-- preview HTML path from a prior preview or clone flow
+- preview HTML path from a prior `view-content` run
 - local newsletter HTML fragment from `sample-newsletter-block.jinja.html`
 
 ## Expected Outputs
 - Structured JSON describing the source preview, injected output path, and slot token used.
-- A local injected HTML artifact ready for publish.
+- A local injected HTML artifact ready for publish-wrapper pickup.
 
 ## Limitations
 - Only one hardcoded block can be injected today.
 - No structured content input exists for headings, bodies, CTAs, or images.
-- The bundled sample block assumes heading, body, image, and CTA placeholders, but only as one fixed partial.
 - Optional-image rendering is not implemented.
 - The target "up to 10 ordered blocks" newsletter contract is not implemented.
 - No builder JSON or drag-and-drop model is generated; this remains HTML-only.
 - This folder does not call `POST /emails/builder/data` directly.
+- This folder does not choose which artifact gets published; the wrapper currently publishes the newest injected `.html` file it finds.
 
 ## Test Contract
 - Automated tests use Node's built-in test runner.
@@ -61,7 +62,8 @@ Own the newsletter injection step for `ghl-update-template`.
 - Endpoint notes: `../../../ghl-email-endpoints-reference/update-template.md`
 
 ## Routing Rule
-- Route any "inject or update template content" implementation to this folder.
+- Route any "inject local newsletter content into preview HTML" implementation to this folder.
+- Route direct live publish features elsewhere until this package actually owns that API boundary.
 
 ## Example
 - `node ghl-services/ghl-update-template/inject-content/inject-sample.mjs --preview-html ./path/to/preview.html`
