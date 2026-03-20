@@ -7,12 +7,18 @@
     "node": ">=20"
   },
   "scripts": {
+    "clean": "rm -rf dist",
+    "compile": "tsc -p tsconfig.json",
+    "lint": "gts lint",
+    "fix": "gts fix",
+    "test": "node --import tsx --test test/**/*.test.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "fetch:templates": "tsx src/fetch-templates.cli.ts"
   },
   "devDependencies": {
     "@types/node": "^24.4.0",
     "dotenv": "^16.6.1",
+    "gts": "^6.0.2",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2"
   }

@@ -2,323 +2,131 @@
 
 ## Purpose
 
-This document defines how an AI agent should interact with the GoHighLevel Email Template API.
+This document describes how an automation agent should reason about the
+GoHighLevel email-template endpoints used by this repository.
 
 Covered endpoints:
 
-* Fetch Templates → `GET /emails/builder`
-* Create Template → `POST /emails/builder`
-* Update Template → `POST /emails/builder/data`
+- `GET /emails/builder`
+- `POST /emails/builder`
+- `POST /emails/builder/data`
 
-The agent's goal is to **automate newsletter template creation and updates safely and reliably**.
+## Current Repository Reality
 
----
+The repository does not expose one single "do everything" command. The current
+implemented flow is split across services:
 
-## Agent Role
+1. auth validation
+2. template fetch or selection
+3. preview HTML retrieval
+4. draft clone
+5. local newsletter injection
+6. injected draft publish
 
-You are an **Email Template Automation Agent**.
+The inject step is local-first today. Structured 10-block newsletter rendering
+is not implemented yet.
 
-### Responsibilities
+## Agent Responsibilities
 
-1. Fetch available templates
-2. Select the correct template
-3. Create new templates when needed
-4. Inject dynamic HTML content
-5. Update templates with content
-6. Prepare templates for downstream usage
+- Validate auth before downstream operations.
+- Fetch template metadata before assuming a template id.
+- Use `view-content` to resolve the template and preview URL.
+- Use `clone-content` to create a draft and upload HTML.
+- Use `inject-content` only for local slot replacement.
+- Use `publish-injected-draft.mjs` for the current injected-artifact publish path.
 
-### Non-Responsibilities
+## Agent Non-Responsibilities
 
-* Do NOT send emails
-* Do NOT manage campaigns
-* Do NOT modify CRM data
+- Do not send campaigns or emails.
+- Do not manage CRM records.
+- Do not claim builder JSON support that the repo does not implement.
 
----
+## Location And Identity Rules
 
-## Core Concepts
+- Always operate with a valid `locationId`.
+- Never assume a template id without fetching or selecting it first.
+- Prefer `templateId` for live mutations.
+- Treat `previewUrl` as a useful bridge for clone analysis, not as proof of
+  final publish state.
 
-### 1. Location Context
+## Current Endpoint Usage In This Repo
 
-All requests require a `locationId`.
+### Fetch templates
+- Endpoint: `GET /emails/builder`
+- Used by:
+  - `authentication-ghl` as a probe
+  - `ghl-fetch-templates` for inventory snapshot
+  - `view-content` for selection and pagination
 
-* Defines account scope
-* Required for all operations
+### Create draft
+- Endpoint: `POST /emails/builder`
+- Current observed payload in `clone-content`:
 
-**Rule:** Never execute without a valid `locationId`.
-
----
-
-### 2. Template Identity
-
-Each template includes:
-
-* `id`
-* `name`
-
-**Rules:**
-
-* Always fetch before selecting
-* Never assume template IDs
-* Always operate using `templateId`
-
----
-
-### 3. Template Layers
-
-| Layer    | Description             |
-| -------- | ----------------------- |
-| Metadata | name, subject, settings |
-| Content  | HTML / builder (`dnd`)  |
-
-This agent ONLY controls:
-
-* **Content layer**
-
----
-
-## API Behavior Summary
-
-### Fetch Templates
-
-* Endpoint: `GET /emails/builder`
-* Returns: metadata only
-
-⚠️ Does NOT return full content
-
----
-
-### Create Template
-
-* Endpoint: `POST /emails/builder`
-* Purpose: create a new template shell
-
-⚠️ Request schema not fully exposed → must validate via testing
-
----
-
-### Update Template
-
-* Endpoint: `POST /emails/builder/data`
-* Purpose: update template content
-
-Requires:
-
-* `templateId`
-* `locationId`
-* `dnd` (content)
-
----
-
-## Agent Workflow (Canonical)
-
-### Step 1 — Fetch Templates
-
-```
-GET /emails/builder?locationId=...
-```
-
-Store template list.
-
----
-
-### Step 2 — Select or Create Template
-
-IF template exists:
-
-* select by name
-
-ELSE:
-
-* create new template via `POST /emails/builder`
-
-Always output:
-
-```
-templateId
-```
-
----
-
-### Step 3 — Prepare Content
-
-Input:
-
-* generated HTML
-* structured data (news, CTAs)
-
-Output:
-
-```
-dnd = {
-  html: "<html>...</html>"
-}
-```
-
-Rules:
-
-* valid HTML only
-* no broken tags
-* content fully injected
-
----
-
-### Step 4 — Update Template
-
-```
-POST /emails/builder/data
-```
-
-Body:
-
-```
+```json
 {
-  locationId,
-  templateId,
-  dnd
+  "locationId": "loc_123",
+  "name": "Newsletter Draft",
+  "type": "html"
 }
 ```
 
----
+### Update draft HTML
+- Endpoint: `POST /emails/builder/data`
+- Current observed payloads in this repo:
 
-### Step 5 — Validate Response
+Clone step:
 
-Success:
+```json
+{
+  "locationId": "loc_123",
+  "templateId": "tmpl_123",
+  "html": "<html>...</html>",
+  "editorType": "html",
+  "updatedBy": "clone-content"
+}
+```
 
-* HTTP `201`
+Publish wrapper step:
 
-Failure:
+```json
+{
+  "locationId": "loc_123",
+  "templateId": "tmpl_123",
+  "html": "<html>...</html>",
+  "editorType": "html",
+  "updatedBy": "publish-injected-draft"
+}
+```
 
-* handle by error type
+## Newsletter Injection Status
 
----
+### Supported now
+- one explicit body slot token
+- one bundled newsletter block partial
+- local injected HTML artifact generation
+- publish handoff through the clone wrapper
+
+### Missing now
+- up to 10 repeatable blocks
+- structured heading/body/image/CTA input contract
+- optional-image rendering
+- dedicated direct publish command inside `inject-content`
 
 ## Error Handling Rules
 
-### 400 — Bad Request
-
-Cause:
-
-* invalid payload
-
-Action:
-
-* validate structure
-* ensure required fields
-
----
-
-### 401 — Unauthorized
-
-Cause:
-
-* invalid token
-
-Action:
-
-* refresh token
-* verify permissions
-
----
-
-### 404 — Not Found
-
-Cause:
-
-* invalid endpoint or templateId
-
-Action:
-
-* refetch templates
-
----
-
-### 422 — Unprocessable Entity
-
-Cause:
-
-* invalid template structure
-
-Action:
-
-* simplify payload
-* fallback to minimal HTML
-
----
-
-## Content Injection Strategy
-
-### MVP Mode
-
-Use single-block HTML:
-
-```
-<html>
-  <body>
-    <h1>Newsletter</h1>
-    <div>{{CONTENT}}</div>
-  </body>
-</html>
-```
-
----
-
-### Advanced Mode (Future)
-
-* multiple content blocks
-* modular sections
-* dynamic layouts
-
----
-
-## Constraints
-
-* Cannot fetch full builder JSON
-* Cannot fully control metadata via update endpoint
-* Some fields may fail silently
-* Create endpoint schema is not fully documented
-
----
+- Handle `400`, `401`, `404`, and `422` distinctly when possible.
+- Preserve response snippets for diagnostics.
+- Fail fast on missing env or missing template identity.
+- Do not downgrade pagination or preview-fetch failures into "template not found".
 
 ## Best Practices
 
-* Always fetch before update
-* Never overwrite unknown structures blindly
-* Keep payloads simple (MVP)
-* Log all API responses
-* Maintain template version history
-* Separate create vs update logic
-
----
-
-## Agent Design Principles
-
-1. Deterministic execution
-2. No assumptions
-3. Fail safely
-4. Log everything
-5. Prefer simple payloads
-
----
-
-## Example Execution Flow
-
-1. Fetch templates
-2. Look for "Newsletter Template"
-3. If not found → create template
-4. Generate HTML content
-5. Inject into `dnd`
-6. Update template
-7. Confirm success
-
----
+- Keep create and update logic separate.
+- Log enough response context to troubleshoot safely.
+- Keep generated HTML simple and deterministic.
+- Preserve machine-readable JSON at CLI boundaries.
 
 ## Summary
 
-This agent:
-
-* fetches templates
-* creates templates when needed
-* injects HTML content
-* updates templates via API
-
-It forms the core execution engine for automated newsletter generation.
+This repo currently supports a practical draft-clone and local injection flow,
+but not yet a fully structured 10-block newsletter publishing engine.

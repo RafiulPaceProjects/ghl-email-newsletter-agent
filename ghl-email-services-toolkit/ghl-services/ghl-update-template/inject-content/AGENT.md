@@ -1,34 +1,67 @@
 # AGENT.md
 
 ## Purpose
-Planned service for injecting rendered newsletter HTML into a template and sending update requests.
+Own the newsletter injection step for `ghl-update-template`.
+
+## How An Agent Should Use This Package
+- Use this package for local newsletter artifact generation only.
+- Do not treat it as the live API publish layer.
+- Document missing newsletter features explicitly instead of implying they already exist.
 
 ## Current Status
-Planned only. No implementation files exist yet.
+- `inject-sample.mjs` works today as a local HTML artifact generator.
+- API-backed template update execution belongs to clone-content's publish wrapper boundary.
+- Structured multi-block newsletter injection is not implemented yet.
 
-## Intended Responsibility
-- Implement content update flow using POST /emails/builder/data.
-- Build and validate dnd/html payload structure.
-- Execute update and return deterministic JSON result.
+## Entry Points
+- `inject-sample.mjs`: replace the slot token with the sample newsletter block and write an output artifact.
+- `sample-newsletter-block.jinja.html`: source HTML fragment injected into the slot.
+- `test/inject-sample.test.mjs`: current package-local test coverage.
+
+## Inputs / Outputs / Contracts
+- Input: `--preview-html` path to a local preview file.
+- The script validates that the file exists, is `.html`, and contains exactly one `[[[NEWSLETTER_BODY_SLOT]]]` token.
+- It reads one hardcoded partial from `sample-newsletter-block.jinja.html`.
+- It performs a plain string replacement and writes a timestamped artifact to `injection-output/`.
+- Output is structured JSON with `sourcePreview`, `sampleBlockPath`, `outputPath`, and `slotToken`.
+
+## Responsibility
+- Validate the preview HTML input file.
+- Enforce single-slot replacement for `[[[NEWSLETTER_BODY_SLOT]]]`.
+- Generate a timestamped injected HTML artifact under `injection-output/`.
+- Hand off publication responsibility to `../clone-content/publish-injected-draft.mjs`.
 
 ## Expected Inputs
-- locationId and token from shared env.
-- templateId from view-content or clone-content output.
-- rendered HTML content payload.
+- preview HTML path from a prior preview or clone flow
+- local newsletter HTML fragment from `sample-newsletter-block.jinja.html`
 
 ## Expected Outputs
-- Structured result with status, diagnostics, and errorCode.
-- Update confirmation metadata for downstream verification.
+- Structured JSON describing the source preview, injected output path, and slot token used.
+- A local injected HTML artifact ready for publish.
 
-## Integration Dependencies
-- Must reuse authentication checks.
-- Should use template identity from view-content results.
-- Must follow endpoint guidance in ghl-email-endpoints-reference/update-template.md.
+## Limitations
+- Only one hardcoded block can be injected today.
+- No structured content input exists for headings, bodies, CTAs, or images.
+- The bundled sample block assumes heading, body, image, and CTA placeholders, but only as one fixed partial.
+- Optional-image rendering is not implemented.
+- The target "up to 10 ordered blocks" newsletter contract is not implemented.
+- No builder JSON or drag-and-drop model is generated; this remains HTML-only.
+- This folder does not call `POST /emails/builder/data` directly.
 
-## Guardrails for Future Implementation
-- Keep payload validation strict before API call.
-- Preserve a debug-safe response snippet strategy.
-- Avoid mixing preview-scraping concerns into update logic.
+## Test Contract
+- Automated tests use Node's built-in test runner.
+- Primary coverage target: `inject-sample.mjs`
+- Publish execution belongs to clone-content's wrapper boundary, not this package.
+
+## References
+- Existing test: `./test/inject-sample.test.mjs`
+- Publish wrapper: `../clone-content/publish-injected-draft.mjs`
+- Workflow doc: `../clone-content/DATAFLOW.md`
+- Shared testing guide: `../../testing/AGENT.md`
+- Endpoint notes: `../../../ghl-email-endpoints-reference/update-template.md`
 
 ## Routing Rule
-- Route any "inject/update template content" implementation to this folder.
+- Route any "inject or update template content" implementation to this folder.
+
+## Example
+- `node ghl-services/ghl-update-template/inject-content/inject-sample.mjs --preview-html ./path/to/preview.html`

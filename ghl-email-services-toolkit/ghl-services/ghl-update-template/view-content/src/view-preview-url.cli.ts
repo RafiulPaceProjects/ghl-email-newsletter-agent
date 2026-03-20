@@ -1,16 +1,16 @@
-import { viewPreviewUrlDumpFromEnv } from "./viewPreviewUrl.js";
+import {viewPreviewUrlDumpFromEnv} from './viewPreviewUrl.js';
 
 function parseArgValue(
   args: string[],
-  key: "--template-name" | "--template-id"
+  key: '--template-name' | '--template-id',
 ): string | undefined {
   const withEqualsPrefix = `${key}=`;
-  const withEquals = args.find((arg) => arg.startsWith(withEqualsPrefix));
+  const withEquals = args.find(arg => arg.startsWith(withEqualsPrefix));
   if (withEquals) {
     return withEquals.slice(withEqualsPrefix.length).trim() || undefined;
   }
 
-  const index = args.findIndex((arg) => arg === key);
+  const index = args.findIndex(arg => arg === key);
   if (index !== -1 && args[index + 1]) {
     return args[index + 1].trim() || undefined;
   }
@@ -20,12 +20,12 @@ function parseArgValue(
 
 async function run(): Promise<void> {
   const args = process.argv.slice(2);
-  const templateName = parseArgValue(args, "--template-name");
-  const templateId = parseArgValue(args, "--template-id");
+  const templateName = parseArgValue(args, '--template-name');
+  const templateId = parseArgValue(args, '--template-id');
 
   const result = await viewPreviewUrlDumpFromEnv({
     templateName,
-    templateId
+    templateId,
   });
 
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
@@ -34,22 +34,22 @@ async function run(): Promise<void> {
 
 run().catch((error: unknown) => {
   const message =
-    error instanceof Error ? error.message : "Unexpected CLI error";
+    error instanceof Error ? error.message : 'Unexpected CLI error';
 
   process.stdout.write(
     `${JSON.stringify(
       {
         ok: false,
-        message: "CLI execution failed unexpectedly.",
-        errorCode: "UNKNOWN_ERROR",
+        message: 'CLI execution failed unexpectedly.',
+        errorCode: 'UNKNOWN_ERROR',
         previewFetch: {
           status: null,
-          responseSnippet: message
-        }
+          responseSnippet: message,
+        },
       },
       null,
-      2
-    )}\n`
+      2,
+    )}\n`,
   );
   process.exitCode = 1;
 });

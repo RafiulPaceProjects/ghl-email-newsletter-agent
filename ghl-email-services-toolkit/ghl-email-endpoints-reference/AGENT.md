@@ -1,29 +1,37 @@
 # AGENT.md
 
 ## Purpose
-This folder documents API endpoint behavior and operating rules for email template automation.
+This folder owns endpoint-level documentation for GoHighLevel email-template
+automation.
 
-## What This Folder Owns
-- Endpoint-level guidance for fetch/create/update flows.
-- Canonical workflow and constraints for template operations.
-- Error-class guidance for HTTP 400/401/404/422 paths.
+## How An Agent Should Use This Folder
+- Start here when the question is about request shape, response behavior, or
+  API constraints.
+- Compare these docs against the current runtime code before changing them.
+- Prefer documenting observed request bodies when the public docs do not expose
+  full schemas clearly.
 
-## What This Folder Does Not Own
-- Runtime execution code.
-- CLI argument parsing.
-- File writing behavior.
+## Inputs / Outputs / Contracts
+- Inputs:
+  - current runtime behavior from `ghl-services`
+  - published HighLevel route and status-code behavior
+- Outputs:
+  - endpoint-specific docs for fetch, create, and update
+  - workflow notes for how the repo currently uses those endpoints
 
 ## Files
-- AGENTS.md: high-level policy and canonical workflow for agents.
-- templates-fetch.md: fetch endpoint details.
-- create-new-template.md: create endpoint details.
-- update-template.md: update endpoint details.
+- `AGENTS.md`: higher-level automation behavior and workflow policy
+- `templates-fetch.md`: `GET /emails/builder`
+- `create-new-template.md`: `POST /emails/builder`
+- `update-template.md`: `POST /emails/builder/data`
 
-## Routing Rules
-- If the task asks "what should the request look like?" route here first.
-- If the task asks "where in code should I implement it?" route to ghl-services.
-- When docs conflict with runtime behavior, treat runtime code as current truth and update docs here.
+## Constraints And Rules
+- Do not claim unsupported features are already implemented.
+- When runtime code and docs conflict, update the docs to match runtime code.
+- Keep endpoint docs explicit about what is observed in this repo versus what is
+  inferred from public API docs.
 
-## Integration Notes
-- Implementations in ghl-services should align with the endpoint version and constraints documented here.
-- Planned services in clone-content and inject-content should use this folder as primary reference.
+## Example Use Cases
+- "What body does clone-content send to create a draft?"
+- "What fields does the publish wrapper send to update a template?"
+- "Which HTTP failures are handled separately?"

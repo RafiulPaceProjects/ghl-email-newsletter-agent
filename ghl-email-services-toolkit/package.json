@@ -1,0 +1,12 @@
+{
+  "name": "ghl-email-services-toolkit",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "fix": "npm --prefix ghl-services/authentication-ghl run fix && npm --prefix ghl-services/ghl-fetch-templates run fix && npm --prefix ghl-services/ghl-update-template/view-content run fix && npm --prefix ghl-services/ghl-update-template/clone-content run fix && npm --prefix ghl-services/ghl-update-template/inject-content run fix",
+    "lint": "npm --prefix ghl-services/authentication-ghl run lint && npm --prefix ghl-services/ghl-fetch-templates run lint && npm --prefix ghl-services/ghl-update-template/view-content run lint && npm --prefix ghl-services/ghl-update-template/clone-content run lint && npm --prefix ghl-services/ghl-update-template/inject-content run lint",
+    "test": "npm --prefix ghl-services/authentication-ghl test && npm --prefix ghl-services/ghl-fetch-templates test && npm --prefix ghl-services/ghl-update-template/view-content test && npm --prefix ghl-services/ghl-update-template/clone-content test && npm --prefix ghl-services/ghl-update-template/inject-content test",
+    "typecheck": "npm --prefix ghl-services/authentication-ghl run typecheck && npm --prefix ghl-services/ghl-fetch-templates run typecheck && npm --prefix ghl-services/ghl-update-template/view-content run typecheck && npm --prefix ghl-services/ghl-update-template/clone-content run typecheck",
+    "validate": "npm run typecheck && npm test && npm run lint"
+  }
+}

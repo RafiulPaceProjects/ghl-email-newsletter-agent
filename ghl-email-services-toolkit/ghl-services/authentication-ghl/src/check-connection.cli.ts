@@ -1,5 +1,5 @@
-import "dotenv/config";
-import { checkGhlConnectionFromEnv } from "./checkGhlConnection.js";
+import 'dotenv/config';
+import {checkGhlConnectionFromEnv} from './checkGhlConnection.js';
 
 async function run(): Promise<void> {
   const result = await checkGhlConnectionFromEnv();
@@ -9,22 +9,22 @@ async function run(): Promise<void> {
 
 run().catch((error: unknown) => {
   const message =
-    error instanceof Error ? error.message : "Unexpected CLI error";
+    error instanceof Error ? error.message : 'Unexpected CLI error';
 
   process.stdout.write(
     `${JSON.stringify(
       {
         ok: false,
-        message: "CLI execution failed unexpectedly.",
-        errorCode: "UNKNOWN_ERROR",
+        message: 'CLI execution failed unexpectedly.',
+        errorCode: 'UNKNOWN_ERROR',
         diagnostics: {
           status: null,
-          responseSnippet: message
-        }
+          responseSnippet: message,
+        },
       },
       null,
-      2
-    )}\n`
+      2,
+    )}\n`,
   );
   process.exitCode = 1;
 });

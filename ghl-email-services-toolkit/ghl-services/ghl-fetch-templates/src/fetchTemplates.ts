@@ -1,31 +1,31 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import dotenv from "dotenv";
+import {mkdir, writeFile} from 'node:fs/promises';
+import {dirname, resolve} from 'node:path';
+import {fileURLToPath} from 'node:url';
+import dotenv from 'dotenv';
 
 import {
   checkGhlConnectionFromEnv,
-  type GhlConnectionResult
-} from "../../authentication-ghl/src/checkGhlConnection.js";
+  type GhlConnectionResult,
+} from '../../authentication-ghl/src/checkGhlConnection.js';
 
-const GHL_BASE_URL = "https://services.leadconnectorhq.com";
-const GHL_API_VERSION = "2021-07-28";
+const GHL_BASE_URL = 'https://services.leadconnectorhq.com';
+const GHL_API_VERSION = '2021-07-28';
 const RESPONSE_SNIPPET_MAX_LENGTH = 280;
 
 const CURRENT_FILE_DIR = dirname(fileURLToPath(import.meta.url));
 const AUTH_ENV_PATH = resolve(
   CURRENT_FILE_DIR,
-  "../../authentication-ghl/.env"
+  '../../authentication-ghl/.env',
 );
-const OUTPUT_FILE_PATH = resolve(CURRENT_FILE_DIR, "../data/templates.json");
+const OUTPUT_FILE_PATH = resolve(CURRENT_FILE_DIR, '../data/templates.json');
 
 export type FetchTemplatesErrorCode =
-  | "AUTH_CHECK_FAILED"
-  | "MISSING_TOKEN"
-  | "MISSING_LOCATION_ID"
-  | "FETCH_FAILED"
-  | "NETWORK_ERROR"
-  | "UNKNOWN_ERROR";
+  | 'AUTH_CHECK_FAILED'
+  | 'MISSING_TOKEN'
+  | 'MISSING_LOCATION_ID'
+  | 'FETCH_FAILED'
+  | 'NETWORK_ERROR'
+  | 'UNKNOWN_ERROR';
 
 export interface FetchTemplatesDiagnostics {
   status: number | null;
@@ -61,13 +61,13 @@ export interface FetchAndSaveTemplatesResult extends FetchTemplatesResult {
 }
 
 function loadSharedEnv(): void {
-  dotenv.config({ path: AUTH_ENV_PATH });
+  dotenv.config({path: AUTH_ENV_PATH});
 }
 
 function cleanSnippet(input: string): string {
-  const normalized = input.replace(/\s+/g, " ").trim();
+  const normalized = input.replace(/\s+/g, ' ').trim();
   if (!normalized) {
-    return "";
+    return '';
   }
   if (normalized.length <= RESPONSE_SNIPPET_MAX_LENGTH) {
     return normalized;
@@ -88,10 +88,12 @@ function parseJsonBody(raw: string): unknown {
 }
 
 function deriveTemplateCount(payload: unknown): number | null {
-  if (!payload || typeof payload !== "object") {
+  if (!payload || typeof payload !== 'object') {
     return null;
   }
 
+  // The API has been observed returning either `builders[]` or `templates[]`
+  // across different callers and docs, so count defensively at the boundary.
   const record = payload as Record<string, unknown>;
 
   if (Array.isArray(record.builders)) {
@@ -112,11 +114,13 @@ function buildEndpoint(locationId: string): string {
 export async function fetchTemplatesFromEnv(): Promise<FetchTemplatesResult> {
   loadSharedEnv();
 
+  // Reuse the auth gate before attempting the inventory fetch so downstream
+  // consumers always receive both fetch diagnostics and auth context together.
   const auth = await checkGhlConnectionFromEnv();
   const fetchedAt = new Date().toISOString();
-  const locationId = process.env.GHL_LOCATION_ID?.trim() ?? "";
-  const token = process.env.GHL_PRIVATE_INTEGRATION_TOKEN?.trim() ?? "";
-  const endpoint = buildEndpoint(locationId || "<missing-location-id>");
+  const locationId = process.env.GHL_LOCATION_ID?.trim() ?? '';
+  const token = process.env.GHL_PRIVATE_INTEGRATION_TOKEN?.trim() ?? '';
+  const endpoint = buildEndpoint(locationId || '<missing-location-id>');
 
   if (!auth.ok) {
     return {
@@ -126,13 +130,13 @@ export async function fetchTemplatesFromEnv(): Promise<FetchTemplatesResult> {
       endpoint,
       status: null,
       templateCount: null,
-      message: "Auth check failed. Fetch was not attempted.",
+      message: 'Auth check failed. Fetch was not attempted.',
       diagnostics: {
         status: null,
-        responseSnippet: auth.message
+        responseSnippet: auth.message,
       },
       auth,
-      errorCode: "AUTH_CHECK_FAILED"
+      errorCode: 'AUTH_CHECK_FAILED',
     };
   }
 
@@ -144,13 +148,13 @@ export async function fetchTemplatesFromEnv(): Promise<FetchTemplatesResult> {
       endpoint,
       status: null,
       templateCount: null,
-      message: "Missing GHL_PRIVATE_INTEGRATION_TOKEN.",
+      message: 'Missing GHL_PRIVATE_INTEGRATION_TOKEN.',
       diagnostics: {
         status: null,
-        responseSnippet: null
+        responseSnippet: null,
       },
       auth,
-      errorCode: "MISSING_TOKEN"
+      errorCode: 'MISSING_TOKEN',
     };
   }
 
@@ -162,29 +166,29 @@ export async function fetchTemplatesFromEnv(): Promise<FetchTemplatesResult> {
       endpoint,
       status: null,
       templateCount: null,
-      message: "Missing GHL_LOCATION_ID.",
+      message: 'Missing GHL_LOCATION_ID.',
       diagnostics: {
         status: null,
-        responseSnippet: null
+        responseSnippet: null,
       },
       auth,
-      errorCode: "MISSING_LOCATION_ID"
+      errorCode: 'MISSING_LOCATION_ID',
     };
   }
 
   const url = new URL(`${GHL_BASE_URL}/emails/builder`);
-  url.searchParams.set("locationId", locationId);
+  url.searchParams.set('locationId', locationId);
 
   try {
     const response = await fetch(url, {
-      method: "GET",
+      method: 'GET',
       headers: {
         Authorization: `Bearer ${token}`,
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        Version: GHL_API_VERSION
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        Version: GHL_API_VERSION,
       },
-      signal: AbortSignal.timeout(12_000)
+      signal: AbortSignal.timeout(12_000),
     });
 
     const rawBody = await response.text();
@@ -203,11 +207,11 @@ export async function fetchTemplatesFromEnv(): Promise<FetchTemplatesResult> {
         message: `Template fetch failed with HTTP ${response.status}.`,
         diagnostics: {
           status: response.status,
-          responseSnippet: snippet
+          responseSnippet: snippet,
         },
         payload: parsedBody,
         auth,
-        errorCode: "FETCH_FAILED"
+        errorCode: 'FETCH_FAILED',
       };
     }
 
@@ -218,17 +222,17 @@ export async function fetchTemplatesFromEnv(): Promise<FetchTemplatesResult> {
       endpoint: buildEndpoint(locationId),
       status: response.status,
       templateCount,
-      message: "Template fetch succeeded.",
+      message: 'Template fetch succeeded.',
       diagnostics: {
         status: response.status,
-        responseSnippet: snippet
+        responseSnippet: snippet,
       },
       payload: parsedBody,
-      auth
+      auth,
     };
   } catch (error) {
     const snippet =
-      error instanceof Error ? cleanSnippet(error.message) : "Unknown error";
+      error instanceof Error ? cleanSnippet(error.message) : 'Unknown error';
 
     return {
       ok: false,
@@ -237,13 +241,13 @@ export async function fetchTemplatesFromEnv(): Promise<FetchTemplatesResult> {
       endpoint: buildEndpoint(locationId),
       status: null,
       templateCount: null,
-      message: "Template fetch failed due to network/runtime error.",
+      message: 'Template fetch failed due to network/runtime error.',
       diagnostics: {
         status: null,
-        responseSnippet: snippet
+        responseSnippet: snippet,
       },
       auth,
-      errorCode: "NETWORK_ERROR"
+      errorCode: 'NETWORK_ERROR',
     };
   }
 }
@@ -251,12 +255,14 @@ export async function fetchTemplatesFromEnv(): Promise<FetchTemplatesResult> {
 export async function fetchAndSaveTemplatesFromEnv(): Promise<FetchAndSaveTemplatesResult> {
   const result = await fetchTemplatesFromEnv();
 
+  // Only persist successful, fully-formed fetches. Failure results still return
+  // the intended output path so callers can report where the snapshot would live.
   if (!result.ok || !result.payload || !result.locationId || !result.status) {
     return {
       ...result,
       outputPath: OUTPUT_FILE_PATH,
       fileWritten: false,
-      errorCode: result.errorCode ?? "UNKNOWN_ERROR"
+      errorCode: result.errorCode ?? 'UNKNOWN_ERROR',
     };
   }
 
@@ -266,16 +272,20 @@ export async function fetchAndSaveTemplatesFromEnv(): Promise<FetchAndSaveTempla
     endpoint: result.endpoint,
     status: result.status,
     templateCount: result.templateCount,
-    payload: result.payload
+    payload: result.payload,
   };
 
   const outputDir = dirname(OUTPUT_FILE_PATH);
-  await mkdir(outputDir, { recursive: true });
-  await writeFile(OUTPUT_FILE_PATH, `${JSON.stringify(filePayload, null, 2)}\n`, "utf-8");
+  await mkdir(outputDir, {recursive: true});
+  await writeFile(
+    OUTPUT_FILE_PATH,
+    `${JSON.stringify(filePayload, null, 2)}\n`,
+    'utf-8',
+  );
 
   return {
     ...result,
     outputPath: OUTPUT_FILE_PATH,
-    fileWritten: true
+    fileWritten: true,
   };
 }

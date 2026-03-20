@@ -1,12 +1,12 @@
 export {
   fetchAndSaveTemplatesFromEnv,
-  fetchTemplatesFromEnv
-} from "./fetchTemplates.js";
+  fetchTemplatesFromEnv,
+} from './fetchTemplates.js';
 
 export type {
   FetchAndSaveTemplatesResult,
   FetchTemplatesDiagnostics,
   FetchTemplatesErrorCode,
   FetchTemplatesResult,
-  TemplatesFilePayload
-} from "./fetchTemplates.js";
+  TemplatesFilePayload,
+} from './fetchTemplates.js';

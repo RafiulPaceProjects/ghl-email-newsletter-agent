@@ -1,45 +1,45 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import {mkdir, writeFile} from 'node:fs/promises';
+import {dirname, resolve} from 'node:path';
+import {fileURLToPath} from 'node:url';
 
 import {
   viewSelectedTemplateFromEnv,
   type SelectedTemplateSummary,
-  type ViewTemplateOptions
-} from "./viewTemplate.js";
+  type ViewTemplateOptions,
+} from './viewTemplate.js';
 
 const RESPONSE_SNIPPET_MAX_LENGTH = 280;
 const PREVIEW_FETCH_TIMEOUT_MS = 12_000;
 
 const CURRENT_FILE_DIR = dirname(fileURLToPath(import.meta.url));
-const PREVIEWS_DIR = resolve(CURRENT_FILE_DIR, "../previews");
+const PREVIEWS_DIR = resolve(CURRENT_FILE_DIR, '../previews');
 
 const VOID_TAGS = new Set([
-  "area",
-  "base",
-  "br",
-  "col",
-  "embed",
-  "hr",
-  "img",
-  "input",
-  "link",
-  "meta",
-  "param",
-  "source",
-  "track",
-  "wbr"
+  'area',
+  'base',
+  'br',
+  'col',
+  'embed',
+  'hr',
+  'img',
+  'input',
+  'link',
+  'meta',
+  'param',
+  'source',
+  'track',
+  'wbr',
 ]);
 
 export type ViewPreviewErrorCode =
-  | "SELECTION_FAILED"
-  | "MISSING_PREVIEW_URL"
-  | "INVALID_PREVIEW_URL"
-  | "PREVIEW_FETCH_HTTP_ERROR"
-  | "PREVIEW_FETCH_NETWORK_ERROR"
-  | "PARSE_ERROR"
-  | "WRITE_ERROR"
-  | "UNKNOWN_ERROR";
+  | 'SELECTION_FAILED'
+  | 'MISSING_PREVIEW_URL'
+  | 'INVALID_PREVIEW_URL'
+  | 'PREVIEW_FETCH_HTTP_ERROR'
+  | 'PREVIEW_FETCH_NETWORK_ERROR'
+  | 'PARSE_ERROR'
+  | 'WRITE_ERROR'
+  | 'UNKNOWN_ERROR';
 
 export interface PreviewFetchDiagnostics {
   status: number | null;
@@ -74,7 +74,7 @@ export interface PreviewDumpPayload {
     templateName: string;
     templateType: string;
     previewUrl: string;
-    sourceStep: "view-preview-url";
+    sourceStep: 'view-preview-url';
   };
   rawHtml: string;
   structured: {
@@ -105,9 +105,9 @@ interface ParsedTag {
 }
 
 function cleanSnippet(input: string): string {
-  const normalized = input.replace(/\s+/g, " ").trim();
+  const normalized = input.replace(/\s+/g, ' ').trim();
   if (!normalized) {
-    return "";
+    return '';
   }
   if (normalized.length <= RESPONSE_SNIPPET_MAX_LENGTH) {
     return normalized;
@@ -117,10 +117,10 @@ function cleanSnippet(input: string): string {
 
 function normalizeText(input: string): string {
   return input
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
     .trim();
 }
 
@@ -136,7 +136,7 @@ function parseAttrs(raw: string): Record<string, string> {
   let match: RegExpExecArray | null = attrRegex.exec(raw);
   while (match) {
     const key = match[1];
-    const value = match[2] ?? match[3] ?? match[4] ?? "";
+    const value = match[2] ?? match[3] ?? match[4] ?? '';
     attrs[key] = value;
     match = attrRegex.exec(raw);
   }
@@ -145,6 +145,8 @@ function parseAttrs(raw: string): Record<string, string> {
 }
 
 function extractBodyHtml(html: string): string {
+  // Prefer the `<body>` contents when present so structured block extraction
+  // focuses on the email payload rather than the full document wrapper.
   const bodyMatch = html.match(/<body\b[^>]*>([\s\S]*?)<\/body>/i);
   if (bodyMatch && bodyMatch[1]) {
     return bodyMatch[1];
@@ -156,7 +158,7 @@ function extractAllMatches(input: string, regex: RegExp): string[] {
   const values: string[] = [];
   let match: RegExpExecArray | null = regex.exec(input);
   while (match) {
-    const value = match.slice(1).find((entry) => typeof entry === "string");
+    const value = match.slice(1).find(entry => typeof entry === 'string');
     const trimmed = value?.trim();
     if (trimmed) {
       values.push(trimmed);
@@ -169,34 +171,33 @@ function extractAllMatches(input: string, regex: RegExp): string[] {
 function extractAllLinks(input: string): string[] {
   return extractAllMatches(
     input,
-    /<a\b[^>]*href\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/gi
+    /<a\b[^>]*href\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/gi,
   );
 }
 
 function extractAllImages(input: string): string[] {
   return extractAllMatches(
     input,
-    /<img\b[^>]*src\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/gi
+    /<img\b[^>]*src\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/gi,
   );
 }
 
 function extractStylesheets(input: string): string[] {
   return extractAllMatches(
     input,
-    /<link\b[^>]*rel\s*=\s*(?:"stylesheet"|'stylesheet'|stylesheet)[^>]*href\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/gi
+    /<link\b[^>]*rel\s*=\s*(?:"stylesheet"|'stylesheet'|stylesheet)[^>]*href\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/gi,
   );
 }
 
 function extractScripts(input: string): string[] {
   return extractAllMatches(
     input,
-    /<script\b[^>]*src\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/gi
+    /<script\b[^>]*src\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/gi,
   );
 }
 
 function extractTopLevelTags(html: string): ParsedTag[] {
-  const tagRegex =
-    /<\/?([A-Za-z][A-Za-z0-9:-]*)(\s[^>]*?)?\s*(\/?)>/g;
+  const tagRegex = /<\/?([A-Za-z][A-Za-z0-9:-]*)(\s[^>]*?)?\s*(\/?)>/g;
   const stack: Array<{
     name: string;
     attrsRaw: string;
@@ -208,10 +209,10 @@ function extractTopLevelTags(html: string): ParsedTag[] {
   let match: RegExpExecArray | null = tagRegex.exec(html);
   while (match) {
     const fullTag = match[0];
-    const name = (match[1] || "").toLowerCase();
-    const attrsRaw = match[2] || "";
+    const name = (match[1] || '').toLowerCase();
+    const attrsRaw = match[2] || '';
     const selfClosedBySlash = Boolean(match[3]);
-    const isClosing = fullTag.startsWith("</");
+    const isClosing = fullTag.startsWith('</');
     const isSelfClosing = selfClosedBySlash || VOID_TAGS.has(name);
 
     if (!isClosing && !isSelfClosing) {
@@ -219,7 +220,7 @@ function extractTopLevelTags(html: string): ParsedTag[] {
         name,
         attrsRaw,
         rawStart: match.index,
-        openTagEnd: tagRegex.lastIndex
+        openTagEnd: tagRegex.lastIndex,
       });
       match = tagRegex.exec(html);
       continue;
@@ -233,7 +234,7 @@ function extractTopLevelTags(html: string): ParsedTag[] {
           rawStart: match.index,
           openTagEnd: tagRegex.lastIndex,
           closeTagEnd: tagRegex.lastIndex,
-          innerHtml: ""
+          innerHtml: '',
         });
       }
       match = tagRegex.exec(html);
@@ -258,7 +259,7 @@ function extractTopLevelTags(html: string): ParsedTag[] {
           rawStart: openTag.rawStart,
           openTagEnd: openTag.openTagEnd,
           closeTagEnd: tagRegex.lastIndex,
-          innerHtml: html.slice(openTag.openTagEnd, match.index)
+          innerHtml: html.slice(openTag.openTagEnd, match.index),
         });
       }
     }
@@ -271,9 +272,9 @@ function extractTopLevelTags(html: string): ParsedTag[] {
 
 function toChildrenSummary(innerHtml: string): PreviewChildSummary[] {
   const childTags = extractTopLevelTags(innerHtml);
-  return childTags.slice(0, 12).map((child) => ({
+  return childTags.slice(0, 12).map(child => ({
     tag: child.name,
-    text: cleanSnippet(normalizeText(child.innerHtml || ""))
+    text: cleanSnippet(normalizeText(child.innerHtml || '')),
   }));
 }
 
@@ -282,17 +283,17 @@ function toStructuredBlocks(bodyHtml: string): PreviewStructuredBlock[] {
   if (topLevel.length === 0) {
     return [
       {
-        tag: "body",
+        tag: 'body',
         text: cleanSnippet(normalizeText(bodyHtml)),
         attrs: {},
         links: extractAllLinks(bodyHtml),
         images: extractAllImages(bodyHtml),
-        children: []
-      }
+        children: [],
+      },
     ];
   }
 
-  return topLevel.map((node) => {
+  return topLevel.map(node => {
     const blockHtml = bodyHtml.slice(node.rawStart, node.closeTagEnd);
     const links = extractAllLinks(blockHtml);
     const images = extractAllImages(blockHtml);
@@ -303,14 +304,17 @@ function toStructuredBlocks(bodyHtml: string): PreviewStructuredBlock[] {
       attrs: parseAttrs(node.attrsRaw),
       links,
       images,
-      children: toChildrenSummary(node.innerHtml)
+      children: toChildrenSummary(node.innerHtml),
     };
   });
 }
 
-function collectAssets(html: string, blocks: PreviewStructuredBlock[]): PreviewAssets {
-  const linksFromBlocks = dedupe(blocks.flatMap((b) => b.links));
-  const imagesFromBlocks = dedupe(blocks.flatMap((b) => b.images));
+function collectAssets(
+  html: string,
+  blocks: PreviewStructuredBlock[],
+): PreviewAssets {
+  const linksFromBlocks = dedupe(blocks.flatMap(b => b.links));
+  const imagesFromBlocks = dedupe(blocks.flatMap(b => b.images));
 
   const stylesheetUrls = extractStylesheets(html);
   const scriptUrls = extractScripts(html);
@@ -319,25 +323,27 @@ function collectAssets(html: string, blocks: PreviewStructuredBlock[]): PreviewA
     links: linksFromBlocks,
     images: imagesFromBlocks,
     stylesheets: dedupe(stylesheetUrls),
-    scripts: dedupe(scriptUrls)
+    scripts: dedupe(scriptUrls),
   };
 }
 
 function formatTimestampForFile(input: Date): string {
   const y = input.getUTCFullYear();
-  const m = String(input.getUTCMonth() + 1).padStart(2, "0");
-  const d = String(input.getUTCDate()).padStart(2, "0");
-  const hh = String(input.getUTCHours()).padStart(2, "0");
-  const mm = String(input.getUTCMinutes()).padStart(2, "0");
-  const ss = String(input.getUTCSeconds()).padStart(2, "0");
+  const m = String(input.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(input.getUTCDate()).padStart(2, '0');
+  const hh = String(input.getUTCHours()).padStart(2, '0');
+  const mm = String(input.getUTCMinutes()).padStart(2, '0');
+  const ss = String(input.getUTCSeconds()).padStart(2, '0');
   return `${y}${m}${d}-${hh}${mm}${ss}`;
 }
 
 function buildDumpPayload(
   fetchedAt: string,
   selectedTemplate: SelectedTemplateSummary,
-  html: string
+  html: string,
 ): PreviewDumpPayload {
+  // The dump keeps both the raw HTML and a lightweight structural summary so
+  // downstream analysis can inspect content without reparsing everything.
   const bodyHtml = extractBodyHtml(html);
   const blocks = toStructuredBlocks(bodyHtml);
   const assets = collectAssets(html, blocks);
@@ -349,18 +355,18 @@ function buildDumpPayload(
       templateName: selectedTemplate.name,
       templateType: selectedTemplate.templateType,
       previewUrl: selectedTemplate.previewUrl,
-      sourceStep: "view-preview-url"
+      sourceStep: 'view-preview-url',
     },
     rawHtml: html,
     structured: {
-      blocks
+      blocks,
     },
-    assets
+    assets,
   };
 }
 
 export async function viewPreviewUrlDumpFromEnv(
-  options: ViewTemplateOptions = {}
+  options: ViewTemplateOptions = {},
 ): Promise<ViewPreviewDumpResult> {
   const fetchedAt = new Date().toISOString();
   const viewResult = await viewSelectedTemplateFromEnv(options);
@@ -373,10 +379,10 @@ export async function viewPreviewUrlDumpFromEnv(
       selectedTemplate: viewResult.selectedTemplate,
       previewFetch: {
         status: null,
-        responseSnippet: viewResult.message
+        responseSnippet: viewResult.message,
       },
-      message: "Template selection failed before preview fetch.",
-      errorCode: "SELECTION_FAILED"
+      message: 'Template selection failed before preview fetch.',
+      errorCode: 'SELECTION_FAILED',
     };
   }
 
@@ -390,10 +396,10 @@ export async function viewPreviewUrlDumpFromEnv(
       selectedTemplate,
       previewFetch: {
         status: null,
-        responseSnippet: null
+        responseSnippet: null,
       },
-      message: "Selected template has no previewUrl.",
-      errorCode: "MISSING_PREVIEW_URL"
+      message: 'Selected template has no previewUrl.',
+      errorCode: 'MISSING_PREVIEW_URL',
     };
   }
 
@@ -408,28 +414,28 @@ export async function viewPreviewUrlDumpFromEnv(
       selectedTemplate,
       previewFetch: {
         status: null,
-        responseSnippet: previewUrlRaw
+        responseSnippet: previewUrlRaw,
       },
-      message: "Selected template previewUrl is not a valid URL.",
-      errorCode: "INVALID_PREVIEW_URL"
+      message: 'Selected template previewUrl is not a valid URL.',
+      errorCode: 'INVALID_PREVIEW_URL',
     };
   }
 
-  let html = "";
+  let html = '';
   let fetchDiagnostics: PreviewFetchDiagnostics = {
     status: null,
-    responseSnippet: null
+    responseSnippet: null,
   };
 
   try {
     const response = await fetch(previewUrl, {
-      method: "GET",
-      signal: AbortSignal.timeout(PREVIEW_FETCH_TIMEOUT_MS)
+      method: 'GET',
+      signal: AbortSignal.timeout(PREVIEW_FETCH_TIMEOUT_MS),
     });
     html = await response.text();
     fetchDiagnostics = {
       status: response.status,
-      responseSnippet: cleanSnippet(html) || null
+      responseSnippet: cleanSnippet(html) || null,
     };
 
     if (!response.ok) {
@@ -440,12 +446,12 @@ export async function viewPreviewUrlDumpFromEnv(
         selectedTemplate,
         previewFetch: fetchDiagnostics,
         message: `Preview URL fetch failed with HTTP ${response.status}.`,
-        errorCode: "PREVIEW_FETCH_HTTP_ERROR"
+        errorCode: 'PREVIEW_FETCH_HTTP_ERROR',
       };
     }
   } catch (error) {
     const snippet =
-      error instanceof Error ? cleanSnippet(error.message) : "Unknown error";
+      error instanceof Error ? cleanSnippet(error.message) : 'Unknown error';
 
     return {
       ok: false,
@@ -454,19 +460,19 @@ export async function viewPreviewUrlDumpFromEnv(
       selectedTemplate,
       previewFetch: {
         status: null,
-        responseSnippet: snippet
+        responseSnippet: snippet,
       },
-      message: "Preview URL fetch failed due to network/runtime error.",
-      errorCode: "PREVIEW_FETCH_NETWORK_ERROR"
+      message: 'Preview URL fetch failed due to network/runtime error.',
+      errorCode: 'PREVIEW_FETCH_NETWORK_ERROR',
     };
   }
 
   try {
-    await mkdir(PREVIEWS_DIR, { recursive: true });
+    await mkdir(PREVIEWS_DIR, {recursive: true});
     const fileStamp = formatTimestampForFile(new Date(fetchedAt));
     const fileName = `${selectedTemplate.id}-${fileStamp}.html`;
     const outputPath = resolve(PREVIEWS_DIR, fileName);
-    await writeFile(outputPath, html, "utf-8");
+    await writeFile(outputPath, html, 'utf-8');
 
     return {
       ok: true,
@@ -474,12 +480,13 @@ export async function viewPreviewUrlDumpFromEnv(
       locationId: viewResult.locationId,
       selectedTemplate,
       outputPath,
+      dump: buildDumpPayload(fetchedAt, selectedTemplate, html),
       previewFetch: fetchDiagnostics,
-      message: "Preview HTML saved successfully."
+      message: 'Preview HTML saved successfully.',
     };
   } catch (error) {
     const snippet =
-      error instanceof Error ? cleanSnippet(error.message) : "Unknown error";
+      error instanceof Error ? cleanSnippet(error.message) : 'Unknown error';
     return {
       ok: false,
       fetchedAt,
@@ -487,10 +494,10 @@ export async function viewPreviewUrlDumpFromEnv(
       selectedTemplate,
       previewFetch: {
         status: fetchDiagnostics.status,
-        responseSnippet: snippet
+        responseSnippet: snippet,
       },
-      message: "Failed to write preview dump file.",
-      errorCode: "WRITE_ERROR"
+      message: 'Failed to write preview dump file.',
+      errorCode: 'WRITE_ERROR',
     };
   }
 }
