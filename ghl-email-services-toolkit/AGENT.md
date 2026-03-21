@@ -2,72 +2,55 @@
 
 ## Purpose
 
-This is the routing document for the `ghl-email-services-toolkit` repository.
-Start here before changing code or docs.
+Routing document for the `ghl-email-services-toolkit` repository. Start here
+before changing code or docs inside the toolkit.
 
 ## How To Think About This Repo
 
 - Treat the system as a staged pipeline, not one monolith.
-- Use runtime code as the source of truth for what works now.
-- Use docs as the source of truth for the intended next architecture.
-- Keep current behavior and planned behavior clearly separated in wording.
+- Keep current runtime behavior and planned next-state architecture separate.
+- Prefer package-local `AGENT.md` files once the target package is known.
+- Use the runtime code as the source of truth when docs drift.
 
 ## Folder Map
 
-- `ghl-email-endpoints-reference`: email builder endpoint behavior and current
-  publish-path notes
-- `ghl-medias-enpoints-reference`: media endpoint behavior for future image
-  upload and link resolution
-- `pexels-api-references`: Pexels sourcing contract for future image selection
-- `ghl-services`: executable services and planned service boundaries
-- `README.md`: human-facing setup, flow, and push checklist
-- `CODEBASE-NOTES.md`: current-state implementation audit
+- `README.md`: human-facing setup and workflow overview
+- `CODEBASE-NOTES.md`: implementation audit and current checkout status
+- `ghl-email-endpoints-reference`: request-shape and endpoint behavior notes
+- `ghl-medias-enpoints-reference`: media endpoint notes for future work
+- `pexels-api-references`: future image-sourcing contract docs
+- `ghl-services`: executable services plus planned boundaries
 
-## Current Workflow
+## Current Runtime Flow
 
-Implemented today:
+Implemented and reliable in this checkout:
 
 1. Validate auth in `ghl-services/authentication-ghl`.
 2. Fetch template inventory in `ghl-services/ghl-fetch-templates`.
-3. Select a template or dump preview HTML in
+3. Resolve a template or save preview HTML in
    `ghl-services/ghl-update-template/view-content`.
-4. Generate structured newsletter research JSON in
-   `ghl-services/research-content`.
-5. Clone preview HTML into a new draft in
-   `ghl-services/ghl-update-template/clone-content`.
-6. Inject a local sample newsletter artifact in
+4. Normalize content fragments in `ghl-services/research-content`.
+5. Normalize render-ready image metadata in
+   `ghl-services/ghl-media-usage`.
+6. Render one explicit newsletter artifact in
    `ghl-services/ghl-update-template/inject-content`.
-7. Publish the newest injected artifact through
-   `ghl-services/ghl-update-template/clone-content/publish-injected-draft.mjs`.
+7. Clone preview HTML into a new draft and publish the explicit rendered HTML
+   in `ghl-services/ghl-update-template/clone-content`.
 
-The current GHL publish path is still preview -> local sample injection ->
-clone/publish. `research-content` is implemented, but it is not yet wired into
-that publish path.
+## Partial Or Planned Areas
+
+- Reference docs may still describe the target pipeline beyond what the
+  runnable packages currently orchestrate end to end.
+- Image sourcing ahead of `ghl-services/ghl-media-usage` is still a planned
+  stage rather than a validated runtime package in this checkout.
 
 ## Intended Next Workflow
 
-The docs in this repo now align to this next target pipeline:
+The documented target pipeline remains:
 
 ```text
-auth -> fetch/view template -> research content -> Pexels candidate download -> Image_Qualifyer final selection -> GHL media upload/link resolution -> final Jinja render -> draft create/update
+auth -> fetch/view template -> research content -> image sourcing -> GHL media upload/link resolution -> final render -> draft create/update
 ```
-
-## Inputs / Outputs / Contracts
-
-- Shared inputs:
-  - `ghl-services/authentication-ghl/.env`
-  - `GHL_PRIVATE_INTEGRATION_TOKEN`
-  - `GHL_LOCATION_ID`
-- Shared output style:
-  - CLI commands emit structured JSON
-  - success returns exit code `0`
-  - failure returns exit code `1`
-- Generated artifacts:
-  - template snapshot JSON
-  - preview HTML dumps
-  - injected/rendered HTML artifacts
-  - Pexels candidate downloads under `ghl-media-usage/pexel_downloader/downloads/`
-  - final approved images and JSON under `ghl-media-usage/Image_Qualifyer/output/`
 
 ## Routing Rules
 
@@ -75,57 +58,47 @@ auth -> fetch/view template -> research content -> Pexels candidate download -> 
 - Template inventory snapshot work: `ghl-services/ghl-fetch-templates`
 - Template lookup or preview analysis:
   `ghl-services/ghl-update-template/view-content`
-- Final render contract work:
+- Local sample injection or future final render work:
   `ghl-services/ghl-update-template/inject-content`
-- Draft creation or explicit publish work:
+- Draft creation or publish-wrapper work:
   `ghl-services/ghl-update-template/clone-content`
-- Research brief to newsletter JSON work:
+- Upstream content fragment generation:
   `ghl-services/research-content`
-- Shared cross-package JSON contract work:
-  `ghl-services/contracts`
-- Planned GHL media upload/link-resolution contract work:
+- Media upload and render-ready image normalization:
   `ghl-services/ghl-media-usage`
-- Pexels sourcing and normalization contract questions:
-  `pexels-api-references`
-- Email endpoint request-shape or API behavior questions:
-  `ghl-email-endpoints-reference`
-- Media endpoint request-shape or scope-guard behavior questions:
-  `ghl-medias-enpoints-reference`
+- Email endpoint behavior questions: `ghl-email-endpoints-reference`
+- Media endpoint behavior questions: `ghl-medias-enpoints-reference`
+- Future Pexels contract questions: `pexels-api-references`
 
 ## Constraints And Rules
 
 - Do not hardcode secrets or location ids.
-- Reuse the shared env contract from `authentication-ghl/.env`.
+- Reuse the shared env contract from `ghl-services/authentication-ghl/.env`.
 - Keep CLI JSON contracts stable and machine-readable.
-- Keep docs aligned with both:
-  - current implementation status
-  - intended next architecture
+- Label planned modules as planned only when code does not exist yet.
 - Generated artifacts under `data/`, `previews/`, and `injection-output/` are
   operational outputs, not source files.
-- Keep candidate downloads out of `Image_Qualifyer/output/`.
-- Keep only the two final approved images in `Image_Qualifyer/output/`.
+- Treat `render-output/` the same way.
 
-## Newsletter Contract Status
+## Validation
 
-### Implemented now
-- one slot token
-- one bundled sample block
-- local artifact generation
-- transitional publish wrapper handoff
+The root maintenance scripts currently cover:
 
-### Planned next
-- ordered research HTML fragments
-- downloader-owned Pexels candidate batches
-- final `Hero` and `Secondary` image approval in `Image_Qualifyer`
-- GHL media upload and hosted-link resolution
-- final Jinja render inside `inject-content`
-- explicit rendered HTML publish through `clone-content`
+- `internal-core`
+- `authentication-ghl`
+- `ghl-fetch-templates`
+- `research-content`
+- `ghl-media-usage`
+- `ghl-update-template/view-content`
+- `ghl-update-template/clone-content`
+- `ghl-update-template/inject-content`
 
 ## Example Commands
 
 - `npm run validate`
 - `npm --prefix ghl-services/authentication-ghl run check:connection`
-- `npm --prefix ghl-services/ghl-media-usage/pexel_downloader run download:images -- --query=<query>`
-- `npm --prefix ghl-services/ghl-media-usage/Image_Qualifyer run qualify:images -- --input-file=<path>`
+- `npm --prefix ghl-services/ghl-fetch-templates run fetch:templates`
 - `npm --prefix ghl-services/ghl-update-template/view-content run view:preview-url -- --template-id=<id>`
+- `npm --prefix ghl-services/research-content test`
+- `npm --prefix ghl-services/ghl-media-usage test`
 - `node ghl-services/ghl-update-template/inject-content/inject-sample.mjs --preview-html ./path/to/preview.html`

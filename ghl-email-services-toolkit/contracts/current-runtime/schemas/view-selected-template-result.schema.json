@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ghl-email-services-toolkit/contracts/current-runtime/view-selected-template-result.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "ok",
+    "fetchedAt",
+    "locationId",
+    "searchedBy",
+    "endpoint",
+    "apiTotal",
+    "returnedCount",
+    "selectedTemplate",
+    "auth",
+    "message",
+    "diagnostics"
+  ],
+  "properties": {
+    "ok": {
+      "type": "boolean"
+    },
+    "fetchedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "locationId": {
+      "type": ["string", "null"]
+    },
+    "searchedBy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "value"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["id", "name"]
+        },
+        "value": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "endpoint": {
+      "type": "string",
+      "minLength": 1
+    },
+    "apiTotal": {
+      "type": ["integer", "null"]
+    },
+    "returnedCount": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "selectedTemplate": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/selectedTemplate"
+        }
+      ]
+    },
+    "auth": {
+      "type": "object"
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1
+    },
+    "diagnostics": {
+      "$ref": "#/$defs/httpDiagnostics"
+    },
+    "errorCode": {
+      "type": "string",
+      "enum": [
+        "AUTH_CHECK_FAILED",
+        "MISSING_TOKEN",
+        "MISSING_LOCATION_ID",
+        "FETCH_400",
+        "FETCH_401",
+        "FETCH_404",
+        "FETCH_422",
+        "FETCH_FAILED",
+        "NETWORK_ERROR",
+        "TEMPLATE_NOT_FOUND",
+        "UNKNOWN_ERROR"
+      ]
+    }
+  },
+  "$defs": {
+    "httpDiagnostics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "responseSnippet"],
+      "properties": {
+        "status": {
+          "type": ["integer", "null"]
+        },
+        "responseSnippet": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "selectedTemplate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "templateType",
+        "previewUrl",
+        "isPlainText",
+        "updatedBy",
+        "dateAdded",
+        "lastUpdated",
+        "version"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "templateType": {
+          "type": "string"
+        },
+        "previewUrl": {
+          "type": "string"
+        },
+        "isPlainText": {
+          "type": "boolean"
+        },
+        "updatedBy": {
+          "type": "string"
+        },
+        "dateAdded": {
+          "type": "string"
+        },
+        "lastUpdated": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

@@ -1,7 +1,14 @@
-import {basename, extname} from 'node:path';
+import {extname} from 'node:path';
 
 import {listFilesInFolder, uploadImageToFolder} from './ghlClient.js';
-import {type GhlRequestContext, type GhlMediaFile, type GhlUploadedImageResult, type GhlUploaderRuntime, type ParsedQualifierManifest, type QualifiedImage} from './types.js';
+import {
+  type GhlMediaFile,
+  type GhlRequestContext,
+  type GhlUploadedImageResult,
+  type GhlUploaderRuntime,
+  type ParsedQualifierManifest,
+  type QualifiedImage,
+} from './types.js';
 
 function slugify(value: string): string {
   const normalized = value
@@ -38,7 +45,13 @@ export async function uploadQualifiedImages(
   runtime: GhlUploaderRuntime = {},
 ): Promise<
   | {ok: true; uploaded: GhlUploadedImageResult[]}
-  | {ok: false; message: string; status: number | null; responseSnippet: string | null; endpoint?: string | null}
+  | {
+      ok: false;
+      message: string;
+      status: number | null;
+      responseSnippet: string | null;
+      endpoint?: string | null;
+    }
 > {
   const uploaded: GhlUploadedImageResult[] = [];
 
@@ -65,8 +78,9 @@ export async function uploadQualifiedImages(
     let resolvedUrl = uploadResult.data.url;
     let matchedId = uploadResult.data.id;
     let matchedName = finalName;
-    
-    // If the GHL API didn't return the URL directly, fallback to polling
+
+    // If the upload response does not include the final hosted URL yet, briefly
+    // re-read the folder contents so the caller still gets render-ready output.
     if (!resolvedUrl) {
       let matched: GhlMediaFile | undefined;
       let listResult;
@@ -84,7 +98,9 @@ export async function uploadQualifiedImages(
         }
 
         matched =
-          listResult.data.find((file: GhlMediaFile) => file.id === uploadResult.data.id) ??
+          listResult.data.find(
+            (file: GhlMediaFile) => file.id === uploadResult.data.id,
+          ) ??
           listResult.data.find((file: GhlMediaFile) => file.name === finalName);
 
         if (matched?.url) {

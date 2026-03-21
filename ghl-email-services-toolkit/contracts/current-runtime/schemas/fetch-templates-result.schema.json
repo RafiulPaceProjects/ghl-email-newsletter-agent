@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ghl-email-services-toolkit/contracts/current-runtime/fetch-templates-result.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "ok",
+    "fetchedAt",
+    "locationId",
+    "endpoint",
+    "status",
+    "templateCount",
+    "message",
+    "diagnostics",
+    "auth"
+  ],
+  "properties": {
+    "ok": {
+      "type": "boolean"
+    },
+    "fetchedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "locationId": {
+      "type": ["string", "null"]
+    },
+    "endpoint": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": ["integer", "null"]
+    },
+    "templateCount": {
+      "type": ["integer", "null"]
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1
+    },
+    "diagnostics": {
+      "$ref": "#/$defs/httpDiagnostics"
+    },
+    "payload": {},
+    "auth": {
+      "$ref": "#/$defs/authResult"
+    },
+    "errorCode": {
+      "type": "string",
+      "enum": [
+        "AUTH_CHECK_FAILED",
+        "MISSING_TOKEN",
+        "MISSING_LOCATION_ID",
+        "FETCH_FAILED",
+        "NETWORK_ERROR",
+        "WRITE_ERROR",
+        "UNKNOWN_ERROR"
+      ]
+    },
+    "outputPath": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fileWritten": {
+      "type": "boolean"
+    }
+  },
+  "$defs": {
+    "httpDiagnostics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "responseSnippet"],
+      "properties": {
+        "status": {
+          "type": ["integer", "null"]
+        },
+        "responseSnippet": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "authResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok", "timestamp", "locationId", "checks", "message"],
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "locationId": {
+          "type": ["string", "null"]
+        },
+        "checks": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["emailBuilder", "users"],
+          "properties": {
+            "emailBuilder": {
+              "$ref": "#/$defs/probeResult"
+            },
+            "users": {
+              "$ref": "#/$defs/probeResult"
+            }
+          }
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        },
+        "errorCode": {
+          "type": "string"
+        }
+      }
+    },
+    "probeResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok", "endpoint", "status", "message", "diagnostics"],
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        },
+        "endpoint": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "type": ["integer", "null"]
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        },
+        "diagnostics": {
+          "$ref": "#/$defs/httpDiagnostics"
+        }
+      }
+    }
+  }
+}

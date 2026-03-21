@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ghl-email-services-toolkit/contracts/current-runtime/render-newsletter-input.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["newsletter"],
+  "properties": {
+    "newsletter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "summary", "ctaLabel", "ctaUrl"],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kicker": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ctaLabel": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ctaUrl": {
+          "type": "string",
+          "format": "uri"
+        },
+        "bodyHtml": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "contentFragments": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "anyOf": [
+          {
+            "type": "string",
+            "minLength": 1
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["html"],
+            "properties": {
+              "html": {
+                "type": "string",
+                "minLength": 1
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "slot": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        ]
+      }
+    },
+    "images": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["url"],
+        "properties": {
+          "slot": {
+            "type": "string",
+            "minLength": 1
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "alt": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  },
+  "anyOf": [
+    {
+      "properties": {
+        "newsletter": {
+          "required": ["bodyHtml"]
+        }
+      }
+    },
+    {
+      "required": ["contentFragments"]
+    }
+  ]
+}

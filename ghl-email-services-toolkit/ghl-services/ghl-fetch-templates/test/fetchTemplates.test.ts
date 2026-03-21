@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import {access, readFile, rm, writeFile} from 'node:fs/promises';
+import {dirname, resolve} from 'node:path';
 import {afterEach, beforeEach, test} from 'node:test';
+import {fileURLToPath} from 'node:url';
 
+import {assertContract} from '../../../contracts/current-runtime/validateContract.mjs';
 import {
   fetchAndSaveTemplatesFromEnv,
   fetchTemplatesFromEnv,
@@ -10,8 +13,8 @@ import {
 const ORIGINAL_FETCH = global.fetch;
 const ORIGINAL_TOKEN = process.env.GHL_PRIVATE_INTEGRATION_TOKEN;
 const ORIGINAL_LOCATION_ID = process.env.GHL_LOCATION_ID;
-const OUTPUT_PATH =
-  '/Users/rafiulhaider/go/ghl-email-agent/ghl-email-services-toolkit/ghl-services/ghl-fetch-templates/data/templates.json';
+const CURRENT_FILE_DIR = dirname(fileURLToPath(import.meta.url));
+const OUTPUT_PATH = resolve(CURRENT_FILE_DIR, '../data/templates.json');
 
 let originalOutputContent: string | null = null;
 
@@ -126,6 +129,7 @@ void test('writes fetched templates to the snapshot file', async () => {
 
   const result = await fetchAndSaveTemplatesFromEnv();
 
+  await assertContract('fetch-templates-result', result);
   assert.equal(result.ok, true);
   assert.equal(result.fileWritten, true);
   await access(OUTPUT_PATH);

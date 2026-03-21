@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {rm} from 'node:fs/promises';
 import {afterEach, beforeEach, test} from 'node:test';
 
+import {assertContract} from '../../../../contracts/current-runtime/validateContract.mjs';
 import {viewPreviewUrlDumpFromEnv} from '../src/viewPreviewUrl.js';
 
 const ORIGINAL_FETCH = global.fetch;
@@ -166,6 +167,7 @@ void test('fetches preview HTML and writes it to disk', async () => {
     templateName: 'Weekly Update',
   });
 
+  await assertContract('view-preview-dump-result', result);
   assert.equal(result.ok, true);
   assert.match(result.outputPath ?? '', /tmpl-1-.*\.html$/);
   await rm(result.outputPath ?? '', {force: true});

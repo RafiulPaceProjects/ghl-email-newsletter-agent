@@ -12,6 +12,7 @@ input.
   wrapper.
 - Reuse `view-content` for selection instead of reimplementing lookup.
 - Treat preview HTML as the current clone payload source.
+- Treat explicit `--rendered-html` input as the current publish payload source.
 
 ### Intended next responsibility
 - Use this package for explicit draft create/update only.
@@ -47,7 +48,7 @@ input.
 
 ### Transitional current wrapper output
 - clone result
-- injected HTML source file path
+- rendered HTML source file path
 - final publish request result
 
 ## Integration Dependencies
@@ -70,12 +71,12 @@ input.
 - Primary coverage targets:
   - `src/cloneTemplate.ts`
   - `publish-injected-draft.mjs`
-- Future tests should prefer explicit rendered-HTML handoff over artifact
-  discovery.
+- Tests should prefer explicit rendered-HTML handoff over artifact discovery.
 
 ## References
 
 - Workflow doc: `./DATAFLOW.md`
+- Current runtime schemas: `../../../contracts/current-runtime/`
 - Package sources:
   - `./src/cloneTemplate.ts`
   - `./publish-injected-draft.mjs`
@@ -90,8 +91,8 @@ input.
 ## Routing Rule
 
 - Route draft creation and explicit HTML publish work to this folder.
-- Treat newest-artifact publishing as current transitional behavior, not the
-  desired long-term contract.
+- Treat `publish-injected-draft.mjs --rendered-html ...` as the current
+  transitional behavior until first-class explicit publish entry points exist.
 
 ## Example
 

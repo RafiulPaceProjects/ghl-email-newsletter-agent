@@ -6,4 +6,5 @@ coverage/
 ghl-services/authentication-ghl/.env
 ghl-services/**/previews/
 ghl-services/**/injection-output/
+ghl-services/**/render-output/
 ghl-services/**/data/templates.json

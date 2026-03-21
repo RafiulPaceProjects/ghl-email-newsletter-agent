@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ghl-email-services-toolkit/contracts/current-runtime/publish-rendered-draft-result.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ok", "message"],
+  "properties": {
+    "ok": {
+      "type": "boolean"
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stage": {
+      "type": ["string", "null"]
+    },
+    "status": {
+      "type": "integer"
+    },
+    "sourceRenderedHtml": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sourceRenderedHtmlBytes": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cloneDraft": {
+      "$ref": "#/$defs/cloneDraft"
+    },
+    "publishRenderedHtml": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "responseSnippet", "data"],
+      "properties": {
+        "status": {
+          "type": ["integer", "null"]
+        },
+        "responseSnippet": {
+          "type": ["string", "null"]
+        },
+        "data": {}
+      }
+    },
+    "templateId": {
+      "type": ["string", "null"]
+    },
+    "previewUrl": {
+      "type": ["string", "null"]
+    },
+    "templateDataDownloadUrl": {
+      "type": ["string", "null"]
+    },
+    "diagnostics": {
+      "type": "object"
+    }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "ok": {
+          "const": true
+        }
+      },
+      "required": [
+        "ok",
+        "message",
+        "stage",
+        "sourceRenderedHtml",
+        "sourceRenderedHtmlBytes",
+        "cloneDraft",
+        "publishRenderedHtml",
+        "templateId",
+        "previewUrl",
+        "templateDataDownloadUrl"
+      ]
+    },
+    {
+      "properties": {
+        "ok": {
+          "const": false
+        }
+      },
+      "required": ["ok", "message"]
+    }
+  ],
+  "$defs": {
+    "cloneDraft": {
+      "type": "object",
+      "required": ["ok"],
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

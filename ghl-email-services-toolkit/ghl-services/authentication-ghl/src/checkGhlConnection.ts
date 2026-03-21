@@ -1,6 +1,14 @@
-const GHL_BASE_URL = 'https://services.leadconnectorhq.com';
-const RESPONSE_SNIPPET_MAX_LENGTH = 280;
-const GHL_API_VERSION = '2021-07-28';
+import {
+  loadToolkitEnv,
+  readGhlEnvConfig,
+  requestGhl,
+} from '../../internal-core/src/index.js';
+
+/**
+ * Shared auth gate for the toolkit. Downstream packages call this first so
+ * they can fail fast on missing env, bad token scope, or location issues
+ * before doing template fetches or draft mutations.
+ */
 
 export type GhlConnectionErrorCode =
   | 'MISSING_TOKEN'
@@ -39,17 +47,6 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
-function cleanSnippet(input: string): string {
-  const normalized = input.replace(/\s+/g, ' ').trim();
-  if (!normalized) {
-    return '';
-  }
-  if (normalized.length <= RESPONSE_SNIPPET_MAX_LENGTH) {
-    return normalized;
-  }
-  return `${normalized.slice(0, RESPONSE_SNIPPET_MAX_LENGTH)}...`;
-}
-
 function emptyProbe(endpoint: string, message: string): ProbeResult {
   return {
     ok: false,
@@ -68,64 +65,39 @@ async function runProbe(
   token: string,
   locationId: string,
 ): Promise<ProbeResult> {
-  const url = new URL(`${GHL_BASE_URL}${endpointPath}`);
-  url.searchParams.set('locationId', locationId);
-
   const endpointWithQuery = `${endpointPath}?locationId=${locationId}`;
 
-  try {
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-        Version: GHL_API_VERSION,
-      },
-      signal: AbortSignal.timeout(12_000),
-    });
+  const response = await requestGhl(endpointPath, {
+    token,
+    query: {locationId},
+  });
 
-    const bodyText = await response.text();
-    const snippet = cleanSnippet(bodyText);
-
-    if (response.ok) {
-      return {
-        ok: true,
-        endpoint: endpointWithQuery,
-        status: response.status,
-        message: 'Probe passed.',
-        diagnostics: {
-          status: response.status,
-          responseSnippet: snippet || null,
-        },
-      };
-    }
-
+  if (!response.ok) {
     return {
       ok: false,
       endpoint: endpointWithQuery,
       status: response.status,
-      message: `Probe failed with HTTP ${response.status}.`,
+      message:
+        response.status === null
+          ? 'Probe failed due to network/runtime error.'
+          : `Probe failed with HTTP ${response.status}.`,
       diagnostics: {
         status: response.status,
-        responseSnippet: snippet || null,
-      },
-    };
-  } catch (error) {
-    const fallback =
-      error instanceof Error ? error.message : 'Unknown network error.';
-
-    return {
-      ok: false,
-      endpoint: endpointWithQuery,
-      status: null,
-      message: 'Probe failed due to network/runtime error.',
-      diagnostics: {
-        status: null,
-        responseSnippet: cleanSnippet(fallback) || null,
+        responseSnippet: response.responseSnippet,
       },
     };
   }
+
+  return {
+    ok: true,
+    endpoint: endpointWithQuery,
+    status: response.status,
+    message: 'Probe passed.',
+    diagnostics: {
+      status: response.status,
+      responseSnippet: response.responseSnippet,
+    },
+  };
 }
 
 function deriveErrorCode(
@@ -149,8 +121,8 @@ function deriveErrorCode(
 }
 
 export async function checkGhlConnectionFromEnv(): Promise<GhlConnectionResult> {
-  const token = process.env.GHL_PRIVATE_INTEGRATION_TOKEN?.trim() ?? '';
-  const locationId = process.env.GHL_LOCATION_ID?.trim() ?? '';
+  loadToolkitEnv();
+  const {token, locationId} = readGhlEnvConfig();
   const timestamp = nowIso();
 
   const emailBuilderEndpoint = '/emails/builder';
