@@ -1,10 +1,14 @@
 import {readFile} from 'node:fs/promises';
+import {
+  cleanSnippet,
+  DEFAULT_GHL_REQUEST_TIMEOUT_MS,
+  DEFAULT_GHL_UPLOAD_TIMEOUT_MS,
+  parseJsonResponse,
+} from '../../../internal-core/src/index.js';
 
 import {
   GHL_API_VERSION,
   GHL_BASE_URL,
-  RESPONSE_SNIPPET_MAX_LENGTH,
-  type FetchLike,
   type GhlApiFailure,
   type GhlApiResult,
   type GhlMediaFile,
@@ -24,31 +28,6 @@ interface RawMediaEntity {
   type?: string;
   mimetype?: string;
   mimeType?: string;
-}
-
-function cleanSnippet(input: string): string | null {
-  const normalized = input.replace(/\s+/g, ' ').trim();
-  if (!normalized) {
-    return null;
-  }
-  if (normalized.length <= RESPONSE_SNIPPET_MAX_LENGTH) {
-    return normalized;
-  }
-  return `${normalized.slice(0, RESPONSE_SNIPPET_MAX_LENGTH)}...`;
-}
-
-async function parseJsonResponse<T>(
-  response: Awaited<ReturnType<FetchLike>>,
-): Promise<{data: T | null; text: string}> {
-  const text = await response.text();
-  if (!text.trim()) {
-    return {data: null, text};
-  }
-  try {
-    return {data: JSON.parse(text) as T, text};
-  } catch {
-    return {data: null, text};
-  }
 }
 
 async function performRequest<T>(
@@ -73,7 +52,7 @@ async function performRequest<T>(
         status: response.status,
         endpoint,
         message: `Request failed with HTTP ${response.status}.`,
-        responseSnippet: cleanSnippet(text),
+        responseSnippet: cleanSnippet(text) || null,
       };
     }
 
@@ -82,7 +61,7 @@ async function performRequest<T>(
       status: response.status,
       endpoint,
       data,
-      responseSnippet: cleanSnippet(text),
+      responseSnippet: cleanSnippet(text) || null,
     };
   } catch (error) {
     return {
@@ -90,9 +69,13 @@ async function performRequest<T>(
       status: null,
       endpoint,
       message:
-        error instanceof Error ? error.message : 'Unknown network/runtime error.',
+        error instanceof Error
+          ? error.message
+          : 'Unknown network/runtime error.',
       responseSnippet:
-        cleanSnippet(error instanceof Error ? error.message : 'unknown error'),
+        cleanSnippet(
+          error instanceof Error ? error.message : 'unknown error',
+        ) || null,
     };
   }
 }
@@ -146,7 +129,7 @@ export async function listFolders(
     {
       method: 'GET',
       headers: authHeaders(context),
-      signal: AbortSignal.timeout(12_000),
+      signal: AbortSignal.timeout(DEFAULT_GHL_REQUEST_TIMEOUT_MS),
     },
     runtime,
   );
@@ -155,7 +138,10 @@ export async function listFolders(
     return result;
   }
 
-  const entities = [...(result.data.files ?? []), ...(result.data.folders ?? [])];
+  const entities = [
+    ...(result.data.files ?? []),
+    ...(result.data.folders ?? []),
+  ];
   return {
     ...result,
     data: entities
@@ -180,7 +166,7 @@ export async function listFilesInFolder(
     {
       method: 'GET',
       headers: authHeaders(context),
-      signal: AbortSignal.timeout(12_000),
+      signal: AbortSignal.timeout(DEFAULT_GHL_REQUEST_TIMEOUT_MS),
     },
     runtime,
   );
@@ -206,29 +192,35 @@ export async function uploadImageToFolder(
 ): Promise<GhlApiResult<{id: string; url?: string}>> {
   if (image.sourcePath) {
     const fileBuffer = await (runtime.readFile ?? readFile)(image.sourcePath);
+    const fileBytes = new Uint8Array(fileBuffer);
     const form = new FormData();
     form.set('locationId', context.locationId);
     form.set('folderId', folderId);
     form.set('name', finalName);
     form.set(
       'file',
-      new Blob([fileBuffer], {
-        type: finalName.toLowerCase().endsWith('.png') 
-          ? 'image/png' 
+      new Blob([fileBytes], {
+        type: finalName.toLowerCase().endsWith('.png')
+          ? 'image/png'
           : finalName.toLowerCase().endsWith('.gif')
-          ? 'image/gif'
-          : 'image/jpeg'
+            ? 'image/gif'
+            : 'image/jpeg',
       }),
       finalName,
     );
 
-    const result = await performRequest<{id?: string; _id?: string; fileId?: string; url?: string}>(
+    const result = await performRequest<{
+      id?: string;
+      _id?: string;
+      fileId?: string;
+      url?: string;
+    }>(
       '/medias/upload-file',
       {
         method: 'POST',
         headers: authHeaders(context),
         body: form,
-        signal: AbortSignal.timeout(20_000),
+        signal: AbortSignal.timeout(DEFAULT_GHL_UPLOAD_TIMEOUT_MS),
       },
       runtime,
     );
@@ -251,7 +243,12 @@ export async function uploadImageToFolder(
     return {...result, data: {id, url: result.data.url}};
   }
 
-  const result = await performRequest<{id?: string; _id?: string; fileId?: string; url?: string}>(
+  const result = await performRequest<{
+    id?: string;
+    _id?: string;
+    fileId?: string;
+    url?: string;
+  }>(
     '/medias/upload-file',
     {
       method: 'POST',
@@ -266,7 +263,7 @@ export async function uploadImageToFolder(
         folderId,
         name: finalName,
       }),
-      signal: AbortSignal.timeout(20_000),
+      signal: AbortSignal.timeout(DEFAULT_GHL_UPLOAD_TIMEOUT_MS),
     },
     runtime,
   );
@@ -294,7 +291,9 @@ export async function bulkDeleteFiles(
   fileIds: string[],
   runtime: GhlUploaderRuntime = {},
 ): Promise<GhlApiResult<{deletedCount: number}>> {
-  const result = await performRequest<{deleted?: Array<{id?: string; deleted?: boolean}>}>(
+  const result = await performRequest<{
+    deleted?: Array<{id?: string; deleted?: boolean}>;
+  }>(
     '/medias/delete-files',
     {
       method: 'PUT',
@@ -305,7 +304,7 @@ export async function bulkDeleteFiles(
       body: JSON.stringify({
         files: fileIds.map(id => ({id})),
       }),
-      signal: AbortSignal.timeout(12_000),
+      signal: AbortSignal.timeout(DEFAULT_GHL_REQUEST_TIMEOUT_MS),
     },
     runtime,
   );

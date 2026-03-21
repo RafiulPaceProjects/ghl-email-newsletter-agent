@@ -7,9 +7,11 @@ Own the newsletter render step for `ghl-update-template`.
 ## How An Agent Should Use This Package
 
 ### Current runtime reality
-- This package is only a local sample-injection utility today.
-- `inject-sample.mjs` performs one string replacement into one preview file.
-- It does not yet own final multi-input rendering or direct publish.
+- This package now owns one explicit render contract for newsletter HTML.
+- `render-newsletter.mjs` renders one output artifact from preview HTML and
+  structured JSON input.
+- `inject-sample.mjs` remains available as a legacy local helper, not the
+  preferred automation contract.
 
 ### Intended next responsibility
 - This package becomes the final Jinja render boundary.
@@ -20,11 +22,14 @@ Own the newsletter render step for `ghl-update-template`.
 
 ## Current Entry Points
 
+- `render-newsletter.mjs`: render one explicit newsletter artifact from
+  `--preview-html` plus `--render-input`.
 - `inject-sample.mjs`: replace the slot token with the sample newsletter block
-  and write an output artifact.
-- `sample-newsletter-block.jinja.html`: source HTML fragment injected into the
-  slot.
+  and write a legacy output artifact.
+- `sample-newsletter-block.jinja.html`: block template used by both the
+  explicit renderer and the legacy helper.
 - `test/inject-sample.test.mjs`: current package-local test coverage.
+- `test/render-newsletter.test.mjs`: explicit render contract coverage.
 
 ## Target Contract
 
@@ -43,23 +48,33 @@ Own the newsletter render step for `ghl-update-template`.
 
 ## Current Inputs / Outputs / Contracts
 
+### Explicit render contract
+- Inputs:
+  - `--preview-html` path to a local preview file
+  - `--render-input` path to a JSON file containing newsletter fields plus
+    either `newsletter.bodyHtml` or `contentFragments[]`
+- Behavior:
+  - validates the preview file and JSON input
+  - enforces exactly one `[[[NEWSLETTER_BODY_SLOT]]]` token
+  - renders one newsletter block from explicit input
+  - writes a timestamped artifact to `render-output/`
+- Output:
+  - structured JSON with `sourcePreview`, `renderInputPath`, `outputPath`,
+    `contentFragmentCount`, `imageCount`, and `slotToken`
+
+### Legacy sample helper
 - Input: `--preview-html` path to a local preview file.
-- The current script validates that the file exists, is `.html`, and contains
-  exactly one `[[[NEWSLETTER_BODY_SLOT]]]` token.
-- It reads one hardcoded partial from `sample-newsletter-block.jinja.html`.
-- It performs a plain string replacement and writes a timestamped artifact to
-  `injection-output/`.
-- Output is structured JSON with `sourcePreview`, `sampleBlockPath`,
+- Output: structured JSON with `sourcePreview`, `sampleBlockPath`,
   `outputPath`, and `slotToken`.
 
 ## Responsibility
 
 ### Current runtime
-- Validate the preview HTML input file.
+- Validate preview HTML and render-input files.
 - Enforce single-slot replacement for `[[[NEWSLETTER_BODY_SLOT]]]`.
-- Generate a timestamped injected HTML artifact under `injection-output/`.
+- Generate a timestamped rendered HTML artifact under `render-output/`.
 - Hand off publication responsibility to
-  `../clone-content/publish-injected-draft.mjs`.
+  `../clone-content/publish-injected-draft.mjs --rendered-html ...`.
 
 ### Planned next
 - Accept explicit upstream content and image contracts.
@@ -68,17 +83,18 @@ Own the newsletter render step for `ghl-update-template`.
 
 ## Limitations In Runtime
 
-- Only one hardcoded block can be injected today.
-- No structured content input exists for multiple render inputs.
+- Only one newsletter block layout is supported today.
 - No explicit research-content handoff exists yet.
 - No GHL image-object handoff exists yet.
-- No optional-image rendering is implemented.
-- No direct render-to-publish handoff exists yet.
+- No direct render-to-publish API exists yet; the package still hands off a
+  rendered artifact path to `clone-content`.
 
 ## Test Contract
 
 - Automated tests use Node's built-in test runner.
-- Primary current coverage target: `inject-sample.mjs`
+- Primary current coverage targets:
+  - `render-newsletter.mjs`
+  - `inject-sample.mjs`
 - Future render coverage should validate:
   - ordered fragment assembly
   - GHL image object injection
@@ -88,6 +104,8 @@ Own the newsletter render step for `ghl-update-template`.
 ## References
 
 - Existing test: `./test/inject-sample.test.mjs`
+- Explicit render test: `./test/render-newsletter.test.mjs`
+- Current runtime schemas: `../../../contracts/current-runtime/`
 - Current sample template: `./sample-newsletter-block.jinja.html`
 - Current publish wrapper: `../clone-content/publish-injected-draft.mjs`
 - Shared testing guide: `../../testing/AGENT.md`
@@ -102,3 +120,4 @@ Own the newsletter render step for `ghl-update-template`.
 ## Example
 
 - `node ghl-services/ghl-update-template/inject-content/inject-sample.mjs --preview-html ./path/to/preview.html`
+- `node ghl-services/ghl-update-template/inject-content/render-newsletter.mjs --preview-html ./path/to/preview.html --render-input ./path/to/render-input.json`

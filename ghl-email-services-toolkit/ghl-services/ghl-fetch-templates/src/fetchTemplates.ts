@@ -1,22 +1,25 @@
 import {mkdir, writeFile} from 'node:fs/promises';
 import {dirname, resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import dotenv from 'dotenv';
 
 import {
   checkGhlConnectionFromEnv,
   type GhlConnectionResult,
 } from '../../authentication-ghl/src/checkGhlConnection.js';
+import {
+  buildGhlEndpoint,
+  cleanSnippet,
+  loadToolkitEnv,
+  readGhlEnvConfig,
+  requestGhl,
+} from '../../internal-core/src/index.js';
 
-const GHL_BASE_URL = 'https://services.leadconnectorhq.com';
-const GHL_API_VERSION = '2021-07-28';
-const RESPONSE_SNIPPET_MAX_LENGTH = 280;
-
+/**
+ * Template inventory stage. This package keeps the fetch boundary narrow:
+ * reuse the shared auth probe, call the builder listing endpoint, then write
+ * the raw response snapshot to disk for later selection and inspection flows.
+ */
 const CURRENT_FILE_DIR = dirname(fileURLToPath(import.meta.url));
-const AUTH_ENV_PATH = resolve(
-  CURRENT_FILE_DIR,
-  '../../authentication-ghl/.env',
-);
 const OUTPUT_FILE_PATH = resolve(CURRENT_FILE_DIR, '../data/templates.json');
 
 export type FetchTemplatesErrorCode =
@@ -61,33 +64,6 @@ export interface FetchAndSaveTemplatesResult extends FetchTemplatesResult {
   fileWritten: boolean;
 }
 
-function loadSharedEnv(): void {
-  dotenv.config({path: AUTH_ENV_PATH});
-}
-
-function cleanSnippet(input: string): string {
-  const normalized = input.replace(/\s+/g, ' ').trim();
-  if (!normalized) {
-    return '';
-  }
-  if (normalized.length <= RESPONSE_SNIPPET_MAX_LENGTH) {
-    return normalized;
-  }
-  return `${normalized.slice(0, RESPONSE_SNIPPET_MAX_LENGTH)}...`;
-}
-
-function parseJsonBody(raw: string): unknown {
-  if (!raw.trim()) {
-    return {};
-  }
-
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return raw;
-  }
-}
-
 function deriveTemplateCount(payload: unknown): number | null {
   if (!payload || typeof payload !== 'object') {
     return null;
@@ -109,18 +85,17 @@ function deriveTemplateCount(payload: unknown): number | null {
 }
 
 function buildEndpoint(locationId: string): string {
-  return `/emails/builder?locationId=${locationId}`;
+  return buildGhlEndpoint('/emails/builder', {locationId});
 }
 
 export async function fetchTemplatesFromEnv(): Promise<FetchTemplatesResult> {
-  loadSharedEnv();
+  loadToolkitEnv();
 
   // Reuse the auth gate before attempting the inventory fetch so downstream
   // consumers always receive both fetch diagnostics and auth context together.
   const auth = await checkGhlConnectionFromEnv();
   const fetchedAt = new Date().toISOString();
-  const locationId = process.env.GHL_LOCATION_ID?.trim() ?? '';
-  const token = process.env.GHL_PRIVATE_INTEGRATION_TOKEN?.trim() ?? '';
+  const {locationId, token} = readGhlEnvConfig();
   const endpoint = buildEndpoint(locationId || '<missing-location-id>');
 
   if (!auth.ok) {
@@ -177,80 +152,50 @@ export async function fetchTemplatesFromEnv(): Promise<FetchTemplatesResult> {
     };
   }
 
-  const url = new URL(`${GHL_BASE_URL}/emails/builder`);
-  url.searchParams.set('locationId', locationId);
+  const response = await requestGhl('/emails/builder', {
+    token,
+    query: {locationId},
+  });
+  const parsedBody = response.data;
+  const templateCount = deriveTemplateCount(parsedBody);
 
-  try {
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-        Version: GHL_API_VERSION,
-      },
-      signal: AbortSignal.timeout(12_000),
-    });
-
-    const rawBody = await response.text();
-    const parsedBody = parseJsonBody(rawBody);
-    const snippet = cleanSnippet(rawBody) || null;
-    const templateCount = deriveTemplateCount(parsedBody);
-
-    if (!response.ok) {
-      return {
-        ok: false,
-        fetchedAt,
-        locationId,
-        endpoint: buildEndpoint(locationId),
-        status: response.status,
-        templateCount,
-        message: `Template fetch failed with HTTP ${response.status}.`,
-        diagnostics: {
-          status: response.status,
-          responseSnippet: snippet,
-        },
-        payload: parsedBody,
-        auth,
-        errorCode: 'FETCH_FAILED',
-      };
-    }
-
-    return {
-      ok: true,
-      fetchedAt,
-      locationId,
-      endpoint: buildEndpoint(locationId),
-      status: response.status,
-      templateCount,
-      message: 'Template fetch succeeded.',
-      diagnostics: {
-        status: response.status,
-        responseSnippet: snippet,
-      },
-      payload: parsedBody,
-      auth,
-    };
-  } catch (error) {
-    const snippet =
-      error instanceof Error ? cleanSnippet(error.message) : 'Unknown error';
-
+  if (!response.ok) {
     return {
       ok: false,
       fetchedAt,
       locationId,
       endpoint: buildEndpoint(locationId),
-      status: null,
-      templateCount: null,
-      message: 'Template fetch failed due to network/runtime error.',
+      status: response.status,
+      templateCount: response.status === null ? null : templateCount,
+      message:
+        response.status === null
+          ? 'Template fetch failed due to network/runtime error.'
+          : `Template fetch failed with HTTP ${response.status}.`,
       diagnostics: {
-        status: null,
-        responseSnippet: snippet,
+        status: response.status,
+        responseSnippet: response.responseSnippet,
       },
       auth,
-      errorCode: 'NETWORK_ERROR',
+      payload: response.status === null ? undefined : parsedBody,
+      errorCode: response.status === null ? 'NETWORK_ERROR' : 'FETCH_FAILED',
     };
   }
+
+  return {
+    ok: true,
+    fetchedAt,
+    locationId,
+    endpoint: buildEndpoint(locationId),
+    status: response.status,
+    templateCount,
+    message: 'Template fetch succeeded.',
+    diagnostics: {
+      status: response.status,
+      responseSnippet: response.responseSnippet,
+    },
+    payload: parsedBody,
+    auth,
+  };
 }
 
 export async function fetchAndSaveTemplatesFromEnv(): Promise<FetchAndSaveTemplatesResult> {

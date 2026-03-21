@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {afterEach, beforeEach, test} from 'node:test';
 
+import {assertContract} from '../../../contracts/current-runtime/validateContract.mjs';
 import {checkGhlConnectionFromEnv} from '../src/checkGhlConnection.js';
 
 const ORIGINAL_FETCH = global.fetch;
@@ -89,6 +90,7 @@ void test('returns success when both probes pass', async () => {
 
   const result = await checkGhlConnectionFromEnv();
 
+  await assertContract('auth-check-result', result);
   assert.equal(result.ok, true);
   assert.equal(result.errorCode, undefined);
   assert.equal(result.checks.emailBuilder.status, 200);

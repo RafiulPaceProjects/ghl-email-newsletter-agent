@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ghl-email-services-toolkit/contracts/current-runtime/render-newsletter-result.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ok"],
+  "properties": {
+    "ok": {
+      "type": "boolean"
+    },
+    "renderContractVersion": {
+      "type": "string",
+      "const": "v2"
+    },
+    "sourcePreview": {
+      "type": "string",
+      "minLength": 1
+    },
+    "renderInputPath": {
+      "type": "string",
+      "minLength": 1
+    },
+    "blockTemplatePath": {
+      "type": "string",
+      "minLength": 1
+    },
+    "outputPath": {
+      "type": "string",
+      "minLength": 1
+    },
+    "slotToken": {
+      "type": "string",
+      "const": "[[[NEWSLETTER_BODY_SLOT]]]"
+    },
+    "contentFragmentCount": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "imageCount": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "imageSlots": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "ok": {
+          "const": true
+        }
+      },
+      "required": [
+        "ok",
+        "renderContractVersion",
+        "sourcePreview",
+        "renderInputPath",
+        "blockTemplatePath",
+        "outputPath",
+        "slotToken",
+        "contentFragmentCount",
+        "imageCount",
+        "imageSlots"
+      ]
+    },
+    {
+      "properties": {
+        "ok": {
+          "const": false
+        }
+      },
+      "required": ["ok", "message"]
+    }
+  ]
+}

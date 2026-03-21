@@ -2,11 +2,17 @@
   "name": "ghl-email-services-toolkit",
   "version": "0.1.0",
   "private": true,
+  "devDependencies": {
+    "ajv": "^8.18.0",
+    "ajv-formats": "^3.0.1",
+    "tsx": "^4.20.5"
+  },
   "scripts": {
-    "fix": "npm --prefix ghl-services/authentication-ghl run fix && npm --prefix ghl-services/ghl-fetch-templates run fix && npm --prefix ghl-services/ghl-update-template/view-content run fix && npm --prefix ghl-services/ghl-update-template/clone-content run fix && npm --prefix ghl-services/ghl-update-template/inject-content run fix",
-    "lint": "npm --prefix ghl-services/authentication-ghl run lint && npm --prefix ghl-services/ghl-fetch-templates run lint && npm --prefix ghl-services/ghl-update-template/view-content run lint && npm --prefix ghl-services/ghl-update-template/clone-content run lint && npm --prefix ghl-services/ghl-update-template/inject-content run lint",
-    "test": "npm --prefix ghl-services/authentication-ghl test && npm --prefix ghl-services/ghl-fetch-templates test && npm --prefix ghl-services/ghl-update-template/view-content test && npm --prefix ghl-services/ghl-update-template/clone-content test && npm --prefix ghl-services/ghl-update-template/inject-content test",
-    "typecheck": "npm --prefix ghl-services/authentication-ghl run typecheck && npm --prefix ghl-services/ghl-fetch-templates run typecheck && npm --prefix ghl-services/ghl-update-template/view-content run typecheck && npm --prefix ghl-services/ghl-update-template/clone-content run typecheck",
+    "fix": "npm --prefix ghl-services/internal-core run fix && npm --prefix ghl-services/authentication-ghl run fix && npm --prefix ghl-services/ghl-fetch-templates run fix && npm --prefix ghl-services/ghl-update-template/view-content run fix && npm --prefix ghl-services/ghl-update-template/clone-content run fix && npm --prefix ghl-services/ghl-update-template/inject-content run fix && npm --prefix ghl-services/research-content run fix && npm --prefix ghl-services/ghl-media-usage run fix",
+    "lint": "npm --prefix ghl-services/internal-core run lint && npm --prefix ghl-services/authentication-ghl run lint && npm --prefix ghl-services/ghl-fetch-templates run lint && npm --prefix ghl-services/ghl-update-template/view-content run lint && npm --prefix ghl-services/ghl-update-template/clone-content run lint && npm --prefix ghl-services/ghl-update-template/inject-content run lint && npm --prefix ghl-services/research-content run lint && npm --prefix ghl-services/ghl-media-usage run lint",
+    "test:highlevel": "node --import tsx --test test/**/*.test.mjs",
+    "test": "npm run test:highlevel && npm --prefix ghl-services/internal-core test && npm --prefix ghl-services/authentication-ghl test && npm --prefix ghl-services/ghl-fetch-templates test && npm --prefix ghl-services/ghl-update-template/view-content test && npm --prefix ghl-services/ghl-update-template/clone-content test && npm --prefix ghl-services/ghl-update-template/inject-content test && npm --prefix ghl-services/research-content test && npm --prefix ghl-services/ghl-media-usage test",
+    "typecheck": "npm --prefix ghl-services/internal-core run typecheck && npm --prefix ghl-services/authentication-ghl run typecheck && npm --prefix ghl-services/ghl-fetch-templates run typecheck && npm --prefix ghl-services/ghl-update-template/view-content run typecheck && npm --prefix ghl-services/ghl-update-template/clone-content run typecheck && npm --prefix ghl-services/research-content run typecheck && npm --prefix ghl-services/ghl-media-usage run typecheck",
     "validate": "npm run typecheck && npm test && npm run lint"
   }
 }

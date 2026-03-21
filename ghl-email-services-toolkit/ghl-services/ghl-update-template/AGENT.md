@@ -9,7 +9,8 @@ Container for template update pipeline services.
 ### Current runtime
 - `view-content` resolves identity and preview context.
 - `clone-content` handles live draft creation and draft update.
-- `inject-content` handles local sample artifact generation.
+- `inject-content` handles explicit newsletter artifact rendering and keeps one
+  legacy local sample helper.
 - The current publish wrapper lives in
   `clone-content/publish-injected-draft.mjs`.
 
@@ -40,8 +41,8 @@ view-content -> research-content -> pexels selection -> ghl-media-usage -> injec
 
 ### `inject-content`
 - current runtime output:
-  - one injected local HTML artifact
-  - JSON describing the source preview and output path
+  - one explicit rendered HTML artifact
+  - JSON describing the source preview, render input, and output path
 - target documented output:
   - final rendered newsletter HTML
   - JSON metadata describing the preview/template input, research fragments,
@@ -65,9 +66,10 @@ view-content -> research-content -> pexels selection -> ghl-media-usage -> injec
 
 ### Supported today
 - one slot token
-- one bundled sample block
-- local artifact handoff
-- transitional publish wrapper
+- one bundled newsletter block template
+- explicit render artifact handoff
+- publish wrapper that requires `--rendered-html`
+- legacy local sample helper
 
 ### Planned next
 - ordered research HTML fragments

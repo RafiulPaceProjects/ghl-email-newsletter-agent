@@ -1,23 +1,21 @@
-import dotenv from 'dotenv';
 import readline from 'node:readline/promises';
-import {dirname, resolve} from 'node:path';
-import {fileURLToPath} from 'node:url';
 
 import {
   checkGhlConnectionFromEnv,
   type GhlConnectionResult,
 } from '../../authentication-ghl/src/checkGhlConnection.js';
+import {
+  buildGhlEndpoint,
+  loadToolkitEnv,
+  readGhlEnvConfig,
+  requestGhl,
+} from '../../internal-core/src/index.js';
 
-const GHL_BASE_URL = 'https://services.leadconnectorhq.com';
-const GHL_API_VERSION = '2021-07-28';
-const RESPONSE_SNIPPET_MAX_LENGTH = 280;
-
-const CURRENT_FILE_DIR = dirname(fileURLToPath(import.meta.url));
-const AUTH_ENV_PATH = resolve(
-  CURRENT_FILE_DIR,
-  '../../authentication-ghl/.env',
-);
-
+/**
+ * Template selection stage for CLI-driven workflows. It fetches the current
+ * builder inventory once, normalizes the candidate list, then resolves either
+ * an explicit flag-based selection or an interactive numbered choice.
+ */
 export type SelectTemplateErrorCode =
   | 'AUTH_CHECK_FAILED'
   | 'MISSING_TOKEN'
@@ -101,35 +99,8 @@ export interface SelectTemplateResult {
   errorCode?: SelectTemplateErrorCode;
 }
 
-function loadSharedEnv(): void {
-  dotenv.config({path: AUTH_ENV_PATH});
-}
-
-function cleanSnippet(input: string): string {
-  const normalized = input.replace(/\s+/g, ' ').trim();
-  if (!normalized) {
-    return '';
-  }
-  if (normalized.length <= RESPONSE_SNIPPET_MAX_LENGTH) {
-    return normalized;
-  }
-  return `${normalized.slice(0, RESPONSE_SNIPPET_MAX_LENGTH)}...`;
-}
-
-function parseJsonBody(raw: string): unknown {
-  if (!raw.trim()) {
-    return {};
-  }
-
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return raw;
-  }
-}
-
 function buildEndpoint(locationId: string): string {
-  return `/emails/builder?locationId=${locationId}`;
+  return buildGhlEndpoint('/emails/builder', {locationId});
 }
 
 function normalizeTemplate(raw: unknown): SelectableTemplate | null {
@@ -263,12 +234,11 @@ async function defaultPromptSelection(
 }
 
 export async function fetchTemplateCandidatesFromEnv(): Promise<FetchTemplateCandidatesResult> {
-  loadSharedEnv();
+  loadToolkitEnv();
 
   const auth = await checkGhlConnectionFromEnv();
   const fetchedAt = new Date().toISOString();
-  const locationId = process.env.GHL_LOCATION_ID?.trim() ?? '';
-  const token = process.env.GHL_PRIVATE_INTEGRATION_TOKEN?.trim() ?? '';
+  const {locationId, token} = readGhlEnvConfig();
   const endpoint = buildEndpoint(locationId || '<missing-location-id>');
 
   if (!auth.ok) {
@@ -328,100 +298,68 @@ export async function fetchTemplateCandidatesFromEnv(): Promise<FetchTemplateCan
     };
   }
 
-  const url = new URL(`${GHL_BASE_URL}/emails/builder`);
-  url.searchParams.set('locationId', locationId);
+  const response = await requestGhl('/emails/builder', {
+    token,
+    query: {locationId},
+  });
+  const candidates = deriveCandidates(response.data);
 
-  try {
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-        Version: GHL_API_VERSION,
-      },
-      signal: AbortSignal.timeout(12_000),
-    });
-
-    const rawBody = await response.text();
-    const parsedBody = parseJsonBody(rawBody);
-    const candidates = deriveCandidates(parsedBody);
-    const snippet = cleanSnippet(rawBody) || null;
-
-    if (!response.ok) {
-      return {
-        ok: false,
-        fetchedAt,
-        locationId,
-        endpoint: buildEndpoint(locationId),
-        status: response.status,
-        candidateCount: candidates.length,
-        candidates,
-        diagnostics: {
-          status: response.status,
-          responseSnippet: snippet,
-        },
-        auth,
-        message: `Template fetch failed with HTTP ${response.status}.`,
-        errorCode: 'FETCH_FAILED',
-      };
-    }
-
-    if (candidates.length === 0) {
-      return {
-        ok: false,
-        fetchedAt,
-        locationId,
-        endpoint: buildEndpoint(locationId),
-        status: response.status,
-        candidateCount: 0,
-        candidates: [],
-        diagnostics: {
-          status: response.status,
-          responseSnippet: snippet,
-        },
-        auth,
-        message: 'Template fetch succeeded but no templates were returned.',
-        errorCode: 'NO_TEMPLATES_FOUND',
-      };
-    }
-
-    return {
-      ok: true,
-      fetchedAt,
-      locationId,
-      endpoint: buildEndpoint(locationId),
-      status: response.status,
-      candidateCount: candidates.length,
-      candidates,
-      diagnostics: {
-        status: response.status,
-        responseSnippet: snippet,
-      },
-      auth,
-      message: 'Template candidates are ready for selection.',
-    };
-  } catch (error) {
-    const snippet =
-      error instanceof Error ? cleanSnippet(error.message) : 'Unknown error';
-
+  if (!response.ok) {
     return {
       ok: false,
       fetchedAt,
       locationId,
       endpoint: buildEndpoint(locationId),
-      status: null,
+      status: response.status,
+      candidateCount: response.status === null ? 0 : candidates.length,
+      candidates: response.status === null ? [] : candidates,
+      diagnostics: {
+        status: response.status,
+        responseSnippet: response.responseSnippet,
+      },
+      auth,
+      message:
+        response.status === null
+          ? 'Template fetch failed due to network/runtime error.'
+          : `Template fetch failed with HTTP ${response.status}.`,
+      errorCode: response.status === null ? 'NETWORK_ERROR' : 'FETCH_FAILED',
+    };
+  }
+
+  if (candidates.length === 0) {
+    return {
+      ok: false,
+      fetchedAt,
+      locationId,
+      endpoint: buildEndpoint(locationId),
+      status: response.status,
       candidateCount: 0,
       candidates: [],
       diagnostics: {
-        status: null,
-        responseSnippet: snippet,
+        status: response.status,
+        responseSnippet: response.responseSnippet,
       },
       auth,
-      message: 'Template fetch failed due to network/runtime error.',
-      errorCode: 'NETWORK_ERROR',
+      message: 'Template fetch succeeded but no templates were returned.',
+      errorCode: 'NO_TEMPLATES_FOUND',
     };
   }
+
+  return {
+    ok: true,
+    fetchedAt,
+    locationId,
+    endpoint: buildEndpoint(locationId),
+    status: response.status,
+    candidateCount: candidates.length,
+    candidates,
+    diagnostics: {
+      status: response.status,
+      responseSnippet: response.responseSnippet,
+    },
+    auth,
+    message: 'Template candidates are ready for selection.',
+  };
 }
 
 export async function runInteractiveTemplateSelection(

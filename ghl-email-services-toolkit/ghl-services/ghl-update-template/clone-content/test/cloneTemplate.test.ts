@@ -6,6 +6,7 @@
 import assert from 'node:assert/strict';
 import {afterEach, beforeEach, test} from 'node:test';
 
+import {assertContract} from '../../../../contracts/current-runtime/validateContract.mjs';
 import {cloneTemplateFromEnv} from '../src/cloneTemplate.js';
 
 const ORIGINAL_FETCH = global.fetch;
@@ -142,6 +143,7 @@ void test('clones a new draft from the base template preview HTML', async () => 
     draftName: 'Weekly Update Draft',
   });
 
+  await assertContract('clone-template-result', result);
   assert.equal(result.ok, true);
   assert.equal(result.clonedTemplate?.id, 'tmpl-clone');
   assert.equal(result.clonedTemplate?.name, 'Weekly Update Draft');

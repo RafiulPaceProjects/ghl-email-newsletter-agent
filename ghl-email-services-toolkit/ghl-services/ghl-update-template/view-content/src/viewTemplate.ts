@@ -1,22 +1,21 @@
-import {dirname, resolve} from 'node:path';
-import {fileURLToPath} from 'node:url';
-import dotenv from 'dotenv';
-
 import {
   checkGhlConnectionFromEnv,
   type GhlConnectionResult,
 } from '../../../authentication-ghl/src/checkGhlConnection.js';
+import {
+  buildGhlEndpoint,
+  loadToolkitEnv,
+  mapHttpErrorCode,
+  readGhlEnvConfig,
+  requestGhl,
+} from '../../../internal-core/src/index.js';
 
-const GHL_BASE_URL = 'https://services.leadconnectorhq.com';
-const GHL_API_VERSION = '2021-07-28';
+/**
+ * Read-only template lookup stage. It owns the logic for finding one template
+ * by id or name, including the extra name-filter and pagination fallback used
+ * when the first builder page does not contain the requested entry.
+ */
 const DEFAULT_TEMPLATE_NAME = 'nycpolicyscopebase';
-const RESPONSE_SNIPPET_MAX_LENGTH = 280;
-
-const CURRENT_FILE_DIR = dirname(fileURLToPath(import.meta.url));
-const AUTH_ENV_PATH = resolve(
-  CURRENT_FILE_DIR,
-  '../../../authentication-ghl/.env',
-);
 
 export type ViewTemplateErrorCode =
   | 'AUTH_CHECK_FAILED'
@@ -88,33 +87,6 @@ export interface ViewTemplateResult {
   errorCode?: ViewTemplateErrorCode;
 }
 
-function loadSharedEnv(): void {
-  dotenv.config({path: AUTH_ENV_PATH});
-}
-
-function cleanSnippet(input: string): string {
-  const normalized = input.replace(/\s+/g, ' ').trim();
-  if (!normalized) {
-    return '';
-  }
-  if (normalized.length <= RESPONSE_SNIPPET_MAX_LENGTH) {
-    return normalized;
-  }
-  return `${normalized.slice(0, RESPONSE_SNIPPET_MAX_LENGTH)}...`;
-}
-
-function parseJsonBody(raw: string): unknown {
-  if (!raw.trim()) {
-    return {};
-  }
-
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return raw;
-  }
-}
-
 function toNumberOrNull(input: unknown): number | null {
   if (typeof input === 'number' && Number.isFinite(input)) {
     return input;
@@ -123,27 +95,14 @@ function toNumberOrNull(input: unknown): number | null {
 }
 
 function mapErrorCodeByStatus(status: number): ViewTemplateErrorCode {
-  if (status === 400) {
-    return 'FETCH_400';
-  }
-  if (status === 401) {
-    return 'FETCH_401';
-  }
-  if (status === 404) {
-    return 'FETCH_404';
-  }
-  if (status === 422) {
-    return 'FETCH_422';
-  }
-  return 'FETCH_FAILED';
+  return mapHttpErrorCode('FETCH', status) as ViewTemplateErrorCode;
 }
 
 function buildEndpoint(
   locationId: string,
   query: Record<string, string> = {},
 ): string {
-  const params = new URLSearchParams({locationId, ...query});
-  return `/emails/builder?${params.toString()}`;
+  return buildGhlEndpoint('/emails/builder', {locationId, ...query});
 }
 
 function safeBuilder(raw: unknown): GhlEmailBuilder | null {
@@ -245,98 +204,75 @@ async function fetchBuildersPage(
   query: Record<string, string>,
 ): Promise<FetchBuildersPageResult> {
   const endpoint = buildEndpoint(locationId, query);
-  const url = new URL(`${GHL_BASE_URL}${endpoint}`);
+  const response = await requestGhl<GhlFetchTemplatesResponse>(
+    '/emails/builder',
+    {
+      token,
+      query: {locationId, ...query},
+    },
+  );
 
-  try {
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-        Version: GHL_API_VERSION,
-      },
-      signal: AbortSignal.timeout(12_000),
-    });
-
-    const rawBody = await response.text();
-    const parsedBody = parseJsonBody(rawBody);
-    const snippet = cleanSnippet(rawBody) || null;
-
-    if (!response.ok) {
-      return {
-        ok: false,
-        status: response.status,
-        endpoint,
-        diagnostics: {
-          status: response.status,
-          responseSnippet: snippet,
-        },
-        builders: [],
-        apiTotal: null,
-        errorCode: mapErrorCodeByStatus(response.status),
-        message: `Template view fetch failed with HTTP ${response.status}.`,
-      };
-    }
-
-    const data =
-      parsedBody && typeof parsedBody === 'object'
-        ? (parsedBody as Record<string, unknown>)
-        : {};
-
-    const rawBuilders = Array.isArray(data.builders) ? data.builders : [];
-    const builders = rawBuilders
-      .map(safeBuilder)
-      .filter((b): b is GhlEmailBuilder => b !== null);
-
-    const totalArray = Array.isArray(data.total) ? data.total : [];
-    const apiTotal = toNumberOrNull(
-      totalArray[0] && typeof totalArray[0] === 'object'
-        ? (totalArray[0] as Record<string, unknown>).total
-        : null,
-    );
-
+  if (!response.ok) {
     return {
-      ok: true,
+      ok: false,
       status: response.status,
       endpoint,
       diagnostics: {
         status: response.status,
-        responseSnippet: snippet,
-      },
-      builders,
-      apiTotal,
-      message: 'Template view fetch succeeded.',
-    };
-  } catch (error) {
-    const snippet =
-      error instanceof Error ? cleanSnippet(error.message) : 'Unknown error';
-
-    return {
-      ok: false,
-      status: null,
-      endpoint,
-      diagnostics: {
-        status: null,
-        responseSnippet: snippet,
+        responseSnippet: response.responseSnippet,
       },
       builders: [],
       apiTotal: null,
-      errorCode: 'NETWORK_ERROR',
-      message: 'Template view failed due to network/runtime error.',
+      errorCode:
+        response.status === null
+          ? 'NETWORK_ERROR'
+          : mapErrorCodeByStatus(response.status),
+      message:
+        response.status === null
+          ? 'Template view failed due to network/runtime error.'
+          : `Template view fetch failed with HTTP ${response.status}.`,
     };
   }
+
+  const data =
+    response.data && typeof response.data === 'object'
+      ? (response.data as Record<string, unknown>)
+      : {};
+
+  const rawBuilders = Array.isArray(data.builders) ? data.builders : [];
+  const builders = rawBuilders
+    .map(safeBuilder)
+    .filter((b): b is GhlEmailBuilder => b !== null);
+
+  const totalArray = Array.isArray(data.total) ? data.total : [];
+  const apiTotal = toNumberOrNull(
+    totalArray[0] && typeof totalArray[0] === 'object'
+      ? (totalArray[0] as Record<string, unknown>).total
+      : null,
+  );
+
+  return {
+    ok: true,
+    status: response.status,
+    endpoint,
+    diagnostics: {
+      status: response.status,
+      responseSnippet: response.responseSnippet,
+    },
+    builders,
+    apiTotal,
+    message: 'Template view fetch succeeded.',
+  };
 }
 
 export async function viewSelectedTemplateFromEnv(
   options: ViewTemplateOptions = {},
 ): Promise<ViewTemplateResult> {
-  loadSharedEnv();
+  loadToolkitEnv();
 
   const auth = await checkGhlConnectionFromEnv();
   const fetchedAt = new Date().toISOString();
-  const locationId = process.env.GHL_LOCATION_ID?.trim() ?? '';
-  const token = process.env.GHL_PRIVATE_INTEGRATION_TOKEN?.trim() ?? '';
+  const {locationId, token} = readGhlEnvConfig();
   const searchedBy = resolveSearch(options);
   const endpoint = buildEndpoint(locationId || '<missing-location-id>');
 

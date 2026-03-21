@@ -1,18 +1,13 @@
-import dotenv from 'dotenv';
-import {dirname, resolve} from 'node:path';
-import {fileURLToPath} from 'node:url';
-
 import {
   DEFAULT_MANAGED_FOLDER_NAME,
   type GhlUploaderDiagnostics,
   type GhlUploaderErrorCode,
   type GhlRequestContext,
 } from './types.js';
-
-const AUTH_ENV_PATH = resolve(
-  dirname(fileURLToPath(import.meta.url)),
-  '../../../authentication-ghl/.env',
-);
+import {
+  loadToolkitEnv,
+  readGhlEnvConfig,
+} from '../../../internal-core/src/index.js';
 
 export interface LoadGhlUploaderEnvSuccess {
   ok: true;
@@ -33,10 +28,9 @@ export type LoadGhlUploaderEnvResult =
 export function loadGhlUploaderEnv(
   managedFolderName = DEFAULT_MANAGED_FOLDER_NAME,
 ): LoadGhlUploaderEnvResult {
-  dotenv.config({path: AUTH_ENV_PATH});
+  loadToolkitEnv();
 
-  const token = process.env.GHL_PRIVATE_INTEGRATION_TOKEN?.trim() ?? '';
-  const locationId = process.env.GHL_LOCATION_ID?.trim() ?? '';
+  const {token, locationId} = readGhlEnvConfig();
 
   if (!token) {
     return {
@@ -69,7 +63,8 @@ export function loadGhlUploaderEnv(
     context: {
       token,
       locationId,
-      managedFolderName: managedFolderName.trim() || DEFAULT_MANAGED_FOLDER_NAME,
+      managedFolderName:
+        managedFolderName.trim() || DEFAULT_MANAGED_FOLDER_NAME,
     },
   };
 }

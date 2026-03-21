@@ -1,0 +1,179 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ghl-email-services-toolkit/contracts/current-runtime/view-preview-dump-result.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "ok",
+    "fetchedAt",
+    "locationId",
+    "selectedTemplate",
+    "previewFetch",
+    "message"
+  ],
+  "properties": {
+    "ok": {
+      "type": "boolean"
+    },
+    "fetchedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "locationId": {
+      "type": ["string", "null"]
+    },
+    "selectedTemplate": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/selectedTemplate"
+        }
+      ]
+    },
+    "outputPath": {
+      "type": "string",
+      "minLength": 1
+    },
+    "previewFetch": {
+      "$ref": "#/$defs/httpDiagnostics"
+    },
+    "dump": {
+      "$ref": "#/$defs/previewDump"
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1
+    },
+    "errorCode": {
+      "type": "string",
+      "enum": [
+        "SELECTION_FAILED",
+        "MISSING_PREVIEW_URL",
+        "INVALID_PREVIEW_URL",
+        "PREVIEW_FETCH_HTTP_ERROR",
+        "PREVIEW_FETCH_NETWORK_ERROR",
+        "PARSE_ERROR",
+        "WRITE_ERROR",
+        "UNKNOWN_ERROR"
+      ]
+    }
+  },
+  "$defs": {
+    "httpDiagnostics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "responseSnippet"],
+      "properties": {
+        "status": {
+          "type": ["integer", "null"]
+        },
+        "responseSnippet": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "selectedTemplate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "templateType",
+        "previewUrl",
+        "isPlainText",
+        "updatedBy",
+        "dateAdded",
+        "lastUpdated",
+        "version"
+      ],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "name": {"type": "string", "minLength": 1},
+        "templateType": {"type": "string"},
+        "previewUrl": {"type": "string"},
+        "isPlainText": {"type": "boolean"},
+        "updatedBy": {"type": "string"},
+        "dateAdded": {"type": "string"},
+        "lastUpdated": {"type": "string"},
+        "version": {"type": "string"}
+      }
+    },
+    "previewDump": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["metadata", "rawHtml", "structured", "assets"],
+      "properties": {
+        "metadata": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "fetchedAt",
+            "templateId",
+            "templateName",
+            "templateType",
+            "previewUrl",
+            "sourceStep"
+          ],
+          "properties": {
+            "fetchedAt": {"type": "string", "format": "date-time"},
+            "templateId": {"type": "string", "minLength": 1},
+            "templateName": {"type": "string", "minLength": 1},
+            "templateType": {"type": "string"},
+            "previewUrl": {"type": "string"},
+            "sourceStep": {"type": "string", "const": "view-preview-url"}
+          }
+        },
+        "rawHtml": {
+          "type": "string"
+        },
+        "structured": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["blocks"],
+          "properties": {
+            "blocks": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["tag", "text", "attrs", "links", "images", "children"],
+                "properties": {
+                  "tag": {"type": "string", "minLength": 1},
+                  "text": {"type": "string"},
+                  "attrs": {"type": "object"},
+                  "links": {"type": "array", "items": {"type": "string"}},
+                  "images": {"type": "array", "items": {"type": "string"}},
+                  "children": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["tag", "text"],
+                      "properties": {
+                        "tag": {"type": "string", "minLength": 1},
+                        "text": {"type": "string"}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "assets": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["links", "images", "stylesheets", "scripts"],
+          "properties": {
+            "links": {"type": "array", "items": {"type": "string"}},
+            "images": {"type": "array", "items": {"type": "string"}},
+            "stylesheets": {"type": "array", "items": {"type": "string"}},
+            "scripts": {"type": "array", "items": {"type": "string"}}
+          }
+        }
+      }
+    }
+  }
+}

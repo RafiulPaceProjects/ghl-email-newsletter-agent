@@ -9,11 +9,14 @@ import {
   viewSelectedTemplateFromEnv,
   type ViewTemplateOptions,
 } from '../../view-content/src/viewTemplate.js';
-
-const GHL_BASE_URL = 'https://services.leadconnectorhq.com';
-const GHL_API_VERSION = '2021-07-28';
-const RESPONSE_SNIPPET_MAX_LENGTH = 280;
-const REQUEST_TIMEOUT_MS = 12_000;
+import {
+  cleanSnippet,
+  DEFAULT_GHL_REQUEST_TIMEOUT_MS,
+  mapHttpErrorCode,
+  parseJsonBody,
+  readGhlEnvConfig,
+  requestGhl,
+} from '../../../internal-core/src/index.js';
 
 export interface CloneTemplateOptions extends ViewTemplateOptions {
   draftName?: string;
@@ -69,19 +72,6 @@ export interface CloneTemplateResult {
   errorCode?: CloneTemplateErrorCode;
 }
 
-// Normalize response text before storing it in diagnostics so error payloads
-// stay readable and bounded across preview, create, and update steps.
-function cleanSnippet(input: string): string {
-  const normalized = input.replace(/\s+/g, ' ').trim();
-  if (!normalized) {
-    return '';
-  }
-  if (normalized.length <= RESPONSE_SNIPPET_MAX_LENGTH) {
-    return normalized;
-  }
-  return `${normalized.slice(0, RESPONSE_SNIPPET_MAX_LENGTH)}...`;
-}
-
 // Use an explicit override when provided; otherwise stamp the derived draft
 // name with UTC time so repeated clones remain distinguishable.
 function buildDraftName(
@@ -109,33 +99,7 @@ function mapMutationErrorCode(
   prefix: 'CREATE' | 'UPDATE',
   status: number,
 ): CloneTemplateErrorCode {
-  if (status === 400) {
-    return `${prefix}_400`;
-  }
-  if (status === 401) {
-    return `${prefix}_401`;
-  }
-  if (status === 404) {
-    return `${prefix}_404`;
-  }
-  if (status === 422) {
-    return `${prefix}_422`;
-  }
-  return `${prefix}_FAILED`;
-}
-
-// Mutation responses sometimes return JSON and sometimes plain text; preserve
-// whichever shape arrives so later helpers can inspect it defensively.
-function parseResponseData(raw: string): unknown {
-  if (!raw.trim()) {
-    return {};
-  }
-
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return raw;
-  }
+  return mapHttpErrorCode(prefix, status) as CloneTemplateErrorCode;
 }
 
 // Convert unknown values into safe object access at the response boundary.
@@ -205,7 +169,7 @@ async function fetchPreviewHtml(previewUrl: string): Promise<
   try {
     const response = await fetch(url, {
       method: 'GET',
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      signal: AbortSignal.timeout(DEFAULT_GHL_REQUEST_TIMEOUT_MS),
     });
     const html = await response.text();
     const diagnostics = {
@@ -251,31 +215,24 @@ async function callMutation(
   body: Record<string, unknown>,
 ): Promise<{
   ok: boolean;
-  status: number;
+  status: number | null;
   diagnostics: CloneTemplateMutationDiagnostics;
   data: unknown;
 }> {
-  const response = await fetch(new URL(`${GHL_BASE_URL}${path}`), {
+  const response = await requestGhl(path, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      Version: GHL_API_VERSION,
-    },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    token,
+    jsonBody: body,
   });
 
-  const rawBody = await response.text();
   return {
     ok: response.ok,
     status: response.status,
     diagnostics: {
       status: response.status,
-      responseSnippet: cleanSnippet(rawBody) || null,
+      responseSnippet: response.responseSnippet,
     },
-    data: parseResponseData(rawBody),
+    data: response.text === null ? null : parseJsonBody(response.text),
   };
 }
 
@@ -287,8 +244,7 @@ export async function cloneTemplateFromEnv(
   // Delegate template selection to the existing view-content flow so this
   // service only owns cloning, not lookup semantics.
   const selection = await viewSelectedTemplateFromEnv(options);
-  const token = process.env.GHL_PRIVATE_INTEGRATION_TOKEN?.trim() ?? '';
-  const locationId = process.env.GHL_LOCATION_ID?.trim() ?? '';
+  const {token, locationId} = readGhlEnvConfig();
 
   const emptyDiagnostics: CloneTemplateMutationDiagnostics = {
     status: null,
@@ -404,7 +360,7 @@ export async function cloneTemplateFromEnv(
     });
     createRequest = create.diagnostics;
 
-    if (!create.ok) {
+    if (!create.ok || create.status === null) {
       return {
         ok: false,
         fetchedAt,
@@ -415,8 +371,14 @@ export async function cloneTemplateFromEnv(
         previewFetch: previewFetch.diagnostics,
         createRequest,
         updateRequest: emptyDiagnostics,
-        message: `Create draft failed with HTTP ${create.status}.`,
-        errorCode: mapMutationErrorCode('CREATE', create.status),
+        message:
+          create.status === null
+            ? 'Create draft failed due to network/runtime error.'
+            : `Create draft failed with HTTP ${create.status}.`,
+        errorCode:
+          create.status === null
+            ? 'CREATE_FAILED'
+            : mapMutationErrorCode('CREATE', create.status),
       };
     }
 
@@ -447,7 +409,7 @@ export async function cloneTemplateFromEnv(
       updatedBy: 'clone-content',
     });
 
-    if (!update.ok) {
+    if (!update.ok || update.status === null) {
       return {
         ok: false,
         fetchedAt,
@@ -458,8 +420,14 @@ export async function cloneTemplateFromEnv(
         previewFetch: previewFetch.diagnostics,
         createRequest,
         updateRequest: update.diagnostics,
-        message: `Draft HTML update failed with HTTP ${update.status}.`,
-        errorCode: mapMutationErrorCode('UPDATE', update.status),
+        message:
+          update.status === null
+            ? 'Draft HTML update failed due to network/runtime error.'
+            : `Draft HTML update failed with HTTP ${update.status}.`,
+        errorCode:
+          update.status === null
+            ? 'UPDATE_FAILED'
+            : mapMutationErrorCode('UPDATE', update.status),
       };
     }
 

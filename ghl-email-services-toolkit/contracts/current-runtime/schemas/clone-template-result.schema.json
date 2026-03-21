@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ghl-email-services-toolkit/contracts/current-runtime/clone-template-result.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "ok",
+    "fetchedAt",
+    "locationId",
+    "baseTemplate",
+    "clonedTemplate",
+    "sourceHtmlLength",
+    "previewFetch",
+    "createRequest",
+    "updateRequest",
+    "message"
+  ],
+  "properties": {
+    "ok": {"type": "boolean"},
+    "fetchedAt": {"type": "string", "format": "date-time"},
+    "locationId": {"type": ["string", "null"]},
+    "baseTemplate": {
+      "anyOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/templateSummary"}
+      ]
+    },
+    "clonedTemplate": {
+      "anyOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/clonedTemplate"}
+      ]
+    },
+    "sourceHtmlLength": {"type": ["integer", "null"]},
+    "previewFetch": {"$ref": "#/$defs/httpDiagnostics"},
+    "createRequest": {"$ref": "#/$defs/httpDiagnostics"},
+    "updateRequest": {"$ref": "#/$defs/httpDiagnostics"},
+    "message": {"type": "string", "minLength": 1},
+    "errorCode": {
+      "type": "string",
+      "enum": [
+        "SELECTION_FAILED",
+        "MISSING_TOKEN",
+        "MISSING_LOCATION_ID",
+        "MISSING_PREVIEW_URL",
+        "INVALID_PREVIEW_URL",
+        "PREVIEW_FETCH_HTTP_ERROR",
+        "PREVIEW_FETCH_NETWORK_ERROR",
+        "CREATE_400",
+        "CREATE_401",
+        "CREATE_404",
+        "CREATE_422",
+        "CREATE_FAILED",
+        "CREATE_MISSING_TEMPLATE_ID",
+        "UPDATE_400",
+        "UPDATE_401",
+        "UPDATE_404",
+        "UPDATE_422",
+        "UPDATE_FAILED",
+        "UNKNOWN_ERROR"
+      ]
+    }
+  },
+  "$defs": {
+    "httpDiagnostics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "responseSnippet"],
+      "properties": {
+        "status": {"type": ["integer", "null"]},
+        "responseSnippet": {"type": ["string", "null"]}
+      }
+    },
+    "templateSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "templateType",
+        "previewUrl",
+        "isPlainText",
+        "updatedBy",
+        "dateAdded",
+        "lastUpdated",
+        "version"
+      ],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "name": {"type": "string", "minLength": 1},
+        "templateType": {"type": "string"},
+        "previewUrl": {"type": "string"},
+        "isPlainText": {"type": "boolean"},
+        "updatedBy": {"type": "string"},
+        "dateAdded": {"type": "string"},
+        "lastUpdated": {"type": "string"},
+        "version": {"type": "string"}
+      }
+    },
+    "clonedTemplate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "editorType",
+        "sourceTemplateId",
+        "sourcePreviewUrl",
+        "previewUrl",
+        "templateDataDownloadUrl"
+      ],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "name": {"type": "string", "minLength": 1},
+        "editorType": {"type": "string", "const": "html"},
+        "sourceTemplateId": {"type": "string", "minLength": 1},
+        "sourcePreviewUrl": {"type": "string", "minLength": 1},
+        "previewUrl": {"type": ["string", "null"]},
+        "templateDataDownloadUrl": {"type": ["string", "null"]}
+      }
+    }
+  }
+}

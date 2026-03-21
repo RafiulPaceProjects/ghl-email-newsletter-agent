@@ -8,6 +8,11 @@ import {
   type ViewTemplateOptions,
 } from './viewTemplate.js';
 
+/**
+ * Preview-dump stage. It keeps two representations together:
+ * the raw HTML saved to disk and a lightweight structural summary that other
+ * tooling can inspect without reparsing the full document every time.
+ */
 const RESPONSE_SNIPPET_MAX_LENGTH = 280;
 const PREVIEW_FETCH_TIMEOUT_MS = 12_000;
 

@@ -2,39 +2,44 @@
 
 ## Purpose
 
-This folder is the execution layer for GoHighLevel email-template operations
-and planned adjacent newsletter services. Each child folder owns one stage of
-the pipeline or one planned stage boundary.
+Execution-layer routing guide for `ghl-services`.
 
 ## How To Think About This Folder
 
-- Keep service boundaries narrow.
-- Reuse upstream contracts instead of duplicating logic.
-- Let auth gate everything downstream.
-- Preserve JSON-first CLI output because other wrappers depend on it.
-- When a module is only planned, label it clearly as planned.
+- Each child folder owns one stage of the pipeline.
+- Auth should fail fast before downstream work starts.
+- Keep JSON-first CLI output because wrappers and tests depend on it.
+- Keep current runtime boundaries explicit even when some stages are still
+  transitional.
 
 ## Service Routing
 
-### Implemented now
+### Implemented and validated now
+
+- `internal-core`: shared env, request, artifact, and CLI helpers
 - `authentication-ghl`: validate token and location scope
 - `ghl-fetch-templates`: fetch template metadata and persist a snapshot
+- `research-content`: normalize ordered content fragments
+- `ghl-media-usage`: resolve media folder state and return render-ready image
+  metadata
 - `ghl-update-template/view-content`: locate a template and save preview HTML
-- `ghl-update-template/clone-content`: create a draft and update draft HTML
-- `ghl-update-template/inject-content`: current local sample-injection utility
+- `ghl-update-template/inject-content`: render explicit newsletter HTML
+  artifacts
+- `ghl-update-template/clone-content`: create a draft and publish explicit
+  rendered HTML
 
-### Planned next
-- `research-content`: produce ordered raw HTML fragments
-- `ghl-media-usage`: upload normalized image selections to GHL and resolve
-  render-ready hosted image links
+### Partial or planned
+
+- image sourcing ahead of `ghl-media-usage`
 
 ## Current Dependency Order
 
 1. `authentication-ghl`
 2. `ghl-fetch-templates` or `ghl-update-template/view-content`
-3. `ghl-update-template/clone-content`
-4. `ghl-update-template/inject-content`
-5. `publish-injected-draft.mjs` when using the current transitional publish path
+3. `research-content`
+4. `ghl-media-usage`
+5. `ghl-update-template/inject-content`
+6. `ghl-update-template/clone-content`
 
 ## Intended Next Dependency Order
 
@@ -42,7 +47,7 @@ the pipeline or one planned stage boundary.
 authentication-ghl
 -> ghl-fetch-templates or ghl-update-template/view-content
 -> research-content
--> pexels execution module (future implementation of pexels-api-references)
+-> image sourcing
 -> ghl-media-usage
 -> ghl-update-template/inject-content
 -> ghl-update-template/clone-content
@@ -53,26 +58,16 @@ authentication-ghl
 - Shared inputs:
   - Node.js 20+
   - `ghl-services/authentication-ghl/.env`
-  - GoHighLevel API base URL and version header
 - Shared outputs:
   - structured JSON from CLIs
   - generated artifacts written under each package's output folder when needed
-
-## Contract Direction
-
-- `research-content` output: ordered raw HTML fragments
-- Pexels output: normalized image selections
-- `ghl-media-usage` output: rich GHL image objects for render
-- `inject-content` target input: preview/template HTML + research fragments +
-  rich GHL image objects
-- `clone-content` target input: explicit rendered HTML
 
 ## Constraints And Rules
 
 - Do not duplicate auth checks in ad hoc ways.
 - Keep `errorCode` values explicit and machine-readable.
-- Do not blur the boundary between final render and live API mutation.
-- Do not describe planned modules as implemented runtime packages.
+- Do not blur preview analysis, final render, and live publish logic together.
+- Do not describe image-sourcing docs as a finished runtime module.
 
 ## Example Commands
 
